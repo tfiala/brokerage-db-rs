@@ -1,14 +1,21 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+// Public modules.
+pub mod account;
+pub mod security;
+pub mod trade_execution;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+// Internal modules.
+mod migrations;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+use anyhow::Result;
+use mongodb::Database;
+use tfiala_mongodb_migrator::migrator::default::DefaultMigrator;
+
+pub async fn run_migrations(db: Database) -> Result<()> {
+    DefaultMigrator::new()
+        .with_conn(db.clone())
+        .with_migrations_vec(migrations::get_migrations())
+        .up()
+        .await?;
+
+    Ok(())
 }

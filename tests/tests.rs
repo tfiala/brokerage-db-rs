@@ -1,4 +1,5 @@
 use anyhow::Result;
+use brokerage_db::run_migrations;
 use mongodb::{Client, Database};
 use testcontainers_modules::{
     mongo::Mongo,
@@ -35,5 +36,12 @@ async fn test_mongodb_container_connection() -> Result<()> {
     // Ping the server to check if the connection is successful
     let result = test.db.run_command(bson::doc! { "ping": 1 }).await;
     assert!(result.is_ok());
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_migration_up_and_down_succeeds() -> Result<()> {
+    let test = TestDb::new_with_db("admin").await?;
+    run_migrations(test.db.clone()).await?;
     Ok(())
 }

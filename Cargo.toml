@@ -7,8 +7,10 @@ description = "Database management for trader brokerage data with a MongoDB back
 
 [dependencies]
 anyhow = "1.0.98"
+async-trait = "0.1.88"
 bson = "2.14.0"
 mongodb = "3.2.3"
+tfiala-mongodb-migrator = "0.2.4"
 tokio = { version = "1.45.0", features = ["full"] }
 
 [dev-dependencies]
