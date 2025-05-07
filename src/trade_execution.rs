@@ -1,4 +1,7 @@
 use crate::{account::BrokerageAccount, security::Security};
+use anyhow::Result;
+use bson::oid::ObjectId;
+use mongodb::Database;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -9,10 +12,46 @@ pub enum TradeSide {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TradeExecution {
     pub _id: bson::oid::ObjectId,
-    pub brokerage_account: BrokerageAccount,
+    pub brokerage_account: bson::oid::ObjectId,
     pub commission: f64,
     pub quantity: u64,
     pub price: f64,
-    pub security: Security,
+    pub security: bson::oid::ObjectId,
     pub side: TradeSide,
+}
+
+impl TradeExecution {
+    pub const COLLECTION_NAME: &'static str = "trade_executions";
+
+    pub async fn insert(&self, db: &Database) -> Result<()> {
+        let result = db
+            .collection::<Self>(Self::COLLECTION_NAME)
+            .insert_one(self)
+            .await?;
+        tracing::info!(
+            "inserted trade execution {:?}: (reported insert id: {:?})",
+            self,
+            result.inserted_id
+        );
+        Ok(())
+    }
+
+    pub async fn find_by_id(db: &Database, id: ObjectId) -> Result<Option<Self>> {
+        let result = db
+            .collection::<Self>(Self::COLLECTION_NAME)
+            .find_one(bson::doc! {"_id": id})
+            .await?;
+
+        Ok(result)
+    }
+
+    pub async fn get_brokerage_account(&self, db: &Database) -> Result<BrokerageAccount> {
+        Ok(BrokerageAccount::find_by_id(db, self.brokerage_account)
+            .await?
+            .unwrap())
+    }
+
+    pub async fn get_security(&self, db: &Database) -> Result<Security> {
+        Ok(Security::find_by_id(db, self.security).await?.unwrap())
+    }
 }

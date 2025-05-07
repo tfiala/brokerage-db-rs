@@ -1,3 +1,7 @@
+use anyhow::Result;
+use bson::{doc, oid::ObjectId};
+use futures::stream::TryStreamExt;
+use mongodb::Database;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -15,4 +19,56 @@ pub struct Security {
 
 impl Security {
     pub const COLLECTION_NAME: &'static str = "securities";
+
+    pub async fn insert(&self, db: &Database) -> Result<()> {
+        let result = db
+            .collection::<Self>(Self::COLLECTION_NAME)
+            .insert_one(self)
+            .await?;
+        tracing::info!(
+            "inserted security {:?}: (reported insert id: {:?})",
+            self,
+            result.inserted_id
+        );
+        Ok(())
+    }
+
+    pub async fn find_by_id(db: &Database, id: ObjectId) -> Result<Option<Self>> {
+        let result = db
+            .collection::<Self>(Self::COLLECTION_NAME)
+            .find_one(bson::doc! {"_id": id})
+            .await?;
+
+        Ok(result)
+    }
+
+    pub async fn find_by_ticker_and_exchange(
+        db: &Database,
+        ticker: &str,
+        listing_exchange: &str,
+    ) -> Result<Option<Self>> {
+        let result = db
+            .collection::<Self>(Self::COLLECTION_NAME)
+            .find_one(bson::doc! {"ticker": ticker, "listing_exchange": listing_exchange})
+            .await?;
+
+        Ok(result)
+    }
+
+    pub async fn find_by_conid(db: &Database, ibkr_conid: u32) -> Result<Option<Self>> {
+        Ok(db
+            .collection::<Self>(Self::COLLECTION_NAME)
+            .find_one(doc! { "ibkr_conid": ibkr_conid })
+            .await?)
+    }
+
+    pub async fn find_by_ticker(db: &Database, ticker: &str) -> Result<Vec<Self>> {
+        let result = db
+            .collection::<Self>(Self::COLLECTION_NAME)
+            .find(doc! { "ticker": ticker })
+            .await?;
+
+        // Convert the cursor to a vector of Security objects.
+        Ok(result.try_collect().await?)
+    }
 }

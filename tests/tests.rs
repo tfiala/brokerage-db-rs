@@ -1,8 +1,7 @@
 use anyhow::Result;
 use brokerage_db::{
     account::BrokerageAccount,
-    find_security, find_security_by_conid, find_security_by_ticker, insert_brokerage_account,
-    insert_security, run_migrations,
+    initialize,
     security::{Security, SecurityType},
 };
 use mongodb::{
@@ -43,7 +42,7 @@ async fn empty_test_db_conn() -> Result<DbConnection> {
 #[fixture]
 async fn test_db_conn() -> Result<DbConnection> {
     let db_conn = DbConnection::new("test").await?;
-    run_migrations(db_conn.db.clone()).await?;
+    initialize(&db_conn.db).await?;
     Ok(db_conn)
 }
 
@@ -104,7 +103,7 @@ async fn test_mongodb_container_connection(
 #[traced_test]
 #[tokio::test]
 async fn test_migration_succeeds(#[future] empty_test_db_conn: Result<DbConnection>) -> Result<()> {
-    run_migrations(empty_test_db_conn.unwrap().db.clone()).await?;
+    initialize(&empty_test_db_conn.unwrap().db).await?;
     Ok(())
 }
 
@@ -117,7 +116,7 @@ async fn insert_brokerage_account_works(
     brokerage_account: BrokerageAccount,
 ) -> Result<()> {
     let dbc = test_db_conn?;
-    insert_brokerage_account(&dbc.db, &brokerage_account).await?;
+    brokerage_account.insert(&dbc.db).await?;
 
     let found_account = dbc
         .db
@@ -144,8 +143,9 @@ async fn insert_duplicate_brokerage_account_fails(
     let dbc = test_db_conn?;
 
     // Insert it once.
-    insert_brokerage_account(&dbc.db, &brokerage_account).await?;
-    let result = insert_brokerage_account(&dbc.db, &brokerage_account).await;
+    brokerage_account.insert(&dbc.db).await?;
+    // And again.
+    let result = brokerage_account.insert(&dbc.db).await;
 
     assert!(result.is_err());
 
@@ -171,18 +171,17 @@ async fn insert_security_works(
     security: Security,
 ) -> Result<()> {
     let dbc = test_db_conn?;
-    insert_security(&dbc.db, &security).await?;
+    security.insert(&dbc.db).await?;
 
-    let found_security = dbc
-        .db
-        .collection::<Security>(Security::COLLECTION_NAME)
-        .find_one(bson::doc! {
-        "ticker": security.ticker.clone(),
-        "listing_exchange": security.listing_exchange.clone() })
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("Security not found"))?;
+    let found_security = Security::find_by_ticker_and_exchange(
+        &dbc.db,
+        &security.ticker,
+        &security.listing_exchange,
+    )
+    .await?;
 
-    assert_eq!(security, found_security);
+    assert!(found_security.is_some());
+    assert_eq!(security, found_security.unwrap());
 
     Ok(())
 }
@@ -196,7 +195,7 @@ async fn insert_security_with_conid_works(
     security_with_conid: Security,
 ) -> Result<()> {
     let dbc = test_db_conn?;
-    insert_security(&dbc.db, &security_with_conid).await?;
+    security_with_conid.insert(&dbc.db).await?;
 
     let found_security = dbc
         .db
@@ -221,7 +220,12 @@ async fn find_non_extant_security_fails(
     security: Security,
 ) -> Result<()> {
     let dbc = test_db_conn?;
-    let result = find_security(&dbc.db, &security.ticker, &security.listing_exchange).await;
+    let result = Security::find_by_ticker_and_exchange(
+        &dbc.db,
+        &security.ticker,
+        &security.listing_exchange,
+    )
+    .await;
 
     assert!(result.is_ok());
     assert!(result.unwrap().is_none());
@@ -238,9 +242,14 @@ async fn find_security_with_ticker_and_exchange_works(
     security: Security,
 ) -> Result<()> {
     let dbc = test_db_conn?;
-    insert_security(&dbc.db, &security).await?;
+    security.insert(&dbc.db).await?;
 
-    let result = find_security(&dbc.db, &security.ticker, &security.listing_exchange).await;
+    let result = Security::find_by_ticker_and_exchange(
+        &dbc.db,
+        &security.ticker,
+        &security.listing_exchange,
+    )
+    .await;
     assert!(result.is_ok());
 
     let found_security = result.unwrap();
@@ -259,9 +268,9 @@ async fn find_security_with_ticker_and_one_match_works(
     security: Security,
 ) -> Result<()> {
     let dbc = test_db_conn?;
-    insert_security(&dbc.db, &security).await?;
+    security.insert(&dbc.db).await?;
 
-    let result = find_security_by_ticker(&dbc.db, &security.ticker).await;
+    let result = Security::find_by_ticker(&dbc.db, &security.ticker).await;
     assert!(result.is_ok());
 
     let found_securities = result.unwrap();
@@ -281,7 +290,7 @@ async fn find_non_extant_security_with_ticker_returns_zero_elements(
 ) -> Result<()> {
     let dbc = test_db_conn?;
 
-    let result = find_security_by_ticker(&dbc.db, &security.ticker).await;
+    let result = Security::find_by_ticker(&dbc.db, &security.ticker).await;
     assert!(result.is_ok());
 
     let found_securities = result.unwrap();
@@ -299,7 +308,7 @@ async fn find_security_with_ticker_and_two_match_works(
     security: Security,
 ) -> Result<()> {
     let dbc = test_db_conn?;
-    insert_security(&dbc.db, &security).await?;
+    security.insert(&dbc.db).await?;
 
     let security2 = Security {
         _id: bson::oid::ObjectId::new(),
@@ -308,9 +317,9 @@ async fn find_security_with_ticker_and_two_match_works(
         security_type: SecurityType::Stock,
         ibkr_conid: None,
     };
-    insert_security(&dbc.db, &security2).await?;
+    security2.insert(&dbc.db).await?;
 
-    let result = find_security_by_ticker(&dbc.db, &security.ticker).await;
+    let result = Security::find_by_ticker(&dbc.db, &security.ticker).await;
     assert!(result.is_ok());
 
     let found_securities = result.unwrap();
@@ -330,9 +339,9 @@ async fn find_security_by_conid_works(
     security_with_conid: Security,
 ) -> Result<()> {
     let dbc = test_db_conn?;
-    insert_security(&dbc.db, &security_with_conid).await?;
+    security_with_conid.insert(&dbc.db).await?;
 
-    let result = find_security_by_conid(&dbc.db, security_with_conid.ibkr_conid.unwrap()).await;
+    let result = Security::find_by_conid(&dbc.db, security_with_conid.ibkr_conid.unwrap()).await;
     assert!(result.is_ok());
 
     let found_security = result.unwrap();
@@ -352,7 +361,7 @@ async fn find_non_extant_security_by_conid_fails(
 ) -> Result<()> {
     let dbc = test_db_conn?;
 
-    let result = find_security_by_conid(&dbc.db, security_with_conid.ibkr_conid.unwrap()).await;
+    let result = Security::find_by_conid(&dbc.db, security_with_conid.ibkr_conid.unwrap()).await;
     assert!(result.is_ok());
 
     let found_security = result.unwrap();
