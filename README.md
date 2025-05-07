@@ -11,7 +11,7 @@ Database management for trader brokerage data with a MongoDB backend.
 
 ```toml
 [dependencies]
-brokerage-db = "0.1.3"
+brokerage-db = "0.1.4"
 ```
 
 ## Functionality
