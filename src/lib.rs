@@ -9,6 +9,7 @@ mod migrations;
 use account::BrokerageAccount;
 use anyhow::Result;
 use mongodb::Database;
+use security::Security;
 use tfiala_mongodb_migrator::migrator::default::DefaultMigrator;
 
 pub async fn run_migrations(db: Database) -> Result<()> {
@@ -31,6 +32,19 @@ pub async fn insert_brokerage_account(
     tracing::info!(
         "inserted brokerage-account {:?}: (reported insert id: {:?})",
         brokerage_account,
+        result.inserted_id
+    );
+    Ok(())
+}
+
+pub async fn insert_security(db: &Database, security: &Security) -> Result<()> {
+    let result = db
+        .collection::<Security>(Security::COLLECTION_NAME)
+        .insert_one(security)
+        .await?;
+    tracing::info!(
+        "inserted security {:?}: (reported insert id: {:?})",
+        security,
         result.inserted_id
     );
     Ok(())

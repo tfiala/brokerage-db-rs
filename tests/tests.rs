@@ -1,5 +1,9 @@
 use anyhow::Result;
-use brokerage_db::{account::BrokerageAccount, insert_brokerage_account, run_migrations};
+use brokerage_db::{
+    account::BrokerageAccount,
+    insert_brokerage_account, insert_security, run_migrations,
+    security::{Security, SecurityType},
+};
 use mongodb::{
     Client, Database,
     error::{Error, ErrorKind, WriteFailure},
@@ -56,6 +60,28 @@ fn brokerage_account() -> BrokerageAccount {
     }
 }
 
+#[fixture]
+fn security() -> Security {
+    Security {
+        _id: bson::oid::ObjectId::new(),
+        ticker: "AAPL".to_string(),
+        listing_exchange: "NASDAQ".to_string(),
+        security_type: SecurityType::Stock,
+        ibkr_conid: None,
+    }
+}
+
+#[fixture]
+fn security_with_conid() -> Security {
+    Security {
+        _id: bson::oid::ObjectId::new(),
+        ticker: "TSLA".to_string(),
+        listing_exchange: "NASDAQ".to_string(),
+        security_type: SecurityType::Stock,
+        ibkr_conid: Some(12345678),
+    }
+}
+
 #[rstest]
 #[awt]
 #[tokio::test]
@@ -85,7 +111,7 @@ async fn test_migration_succeeds(#[future] empty_test_db_conn: Result<DbConnecti
 #[awt]
 #[traced_test]
 #[tokio::test]
-async fn insert_one_brokerage_account_works(
+async fn insert_brokerage_account_works(
     #[future] test_db_conn: Result<DbConnection>,
     brokerage_account: BrokerageAccount,
 ) -> Result<()> {
@@ -110,7 +136,7 @@ async fn insert_one_brokerage_account_works(
 #[awt]
 #[traced_test]
 #[tokio::test]
-async fn insert_same_brokerage_account_twice_fails(
+async fn insert_duplicate_brokerage_account_fails(
     #[future] test_db_conn: Result<DbConnection>,
     brokerage_account: BrokerageAccount,
 ) -> Result<()> {
@@ -131,6 +157,56 @@ async fn insert_same_brokerage_account_twice_fails(
         }
         _ => panic!("Expected a WriteError with code 11000"),
     }
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[traced_test]
+#[tokio::test]
+async fn insert_security_works(
+    #[future] test_db_conn: Result<DbConnection>,
+    security: Security,
+) -> Result<()> {
+    let dbc = test_db_conn?;
+    insert_security(&dbc.db, &security).await?;
+
+    let found_security = dbc
+        .db
+        .collection::<Security>(Security::COLLECTION_NAME)
+        .find_one(bson::doc! {
+        "ticker": security.ticker.clone(),
+        "listing_exchange": security.listing_exchange.clone() })
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Security not found"))?;
+
+    assert_eq!(security, found_security);
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[traced_test]
+#[tokio::test]
+async fn insert_security_with_conid_works(
+    #[future] test_db_conn: Result<DbConnection>,
+    security_with_conid: Security,
+) -> Result<()> {
+    let dbc = test_db_conn?;
+    insert_security(&dbc.db, &security_with_conid).await?;
+
+    let found_security = dbc
+        .db
+        .collection::<Security>(Security::COLLECTION_NAME)
+        .find_one(bson::doc! {
+        "ticker": security_with_conid.ticker.clone(),
+        "listing_exchange": security_with_conid.listing_exchange.clone() })
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Security not found"))?;
+
+    assert_eq!(security_with_conid, found_security);
 
     Ok(())
 }

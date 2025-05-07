@@ -5,10 +5,10 @@ use bson::doc;
 use mongodb::{IndexModel, options::IndexOptions};
 use tfiala_mongodb_migrator::migrator::Env;
 
-pub struct Migration {}
+pub struct Migration001 {}
 
 #[async_trait]
-impl tfiala_mongodb_migrator::migration::Migration for Migration {
+impl tfiala_mongodb_migrator::migration::Migration for Migration001 {
     async fn up(&self, env: Env) -> Result<()> {
         let db = env.db.unwrap();
 
