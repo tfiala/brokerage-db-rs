@@ -1,7 +1,8 @@
 use anyhow::Result;
 use brokerage_db::{
     account::BrokerageAccount,
-    insert_brokerage_account, insert_security, run_migrations,
+    find_security, find_security_by_conid, find_security_by_ticker, insert_brokerage_account,
+    insert_security, run_migrations,
     security::{Security, SecurityType},
 };
 use mongodb::{
@@ -207,6 +208,155 @@ async fn insert_security_with_conid_works(
         .ok_or_else(|| anyhow::anyhow!("Security not found"))?;
 
     assert_eq!(security_with_conid, found_security);
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[traced_test]
+#[tokio::test]
+async fn find_non_extant_security_fails(
+    #[future] test_db_conn: Result<DbConnection>,
+    security: Security,
+) -> Result<()> {
+    let dbc = test_db_conn?;
+    let result = find_security(&dbc.db, &security.ticker, &security.listing_exchange).await;
+
+    assert!(result.is_ok());
+    assert!(result.unwrap().is_none());
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[traced_test]
+#[tokio::test]
+async fn find_security_with_ticker_and_exchange_works(
+    #[future] test_db_conn: Result<DbConnection>,
+    security: Security,
+) -> Result<()> {
+    let dbc = test_db_conn?;
+    insert_security(&dbc.db, &security).await?;
+
+    let result = find_security(&dbc.db, &security.ticker, &security.listing_exchange).await;
+    assert!(result.is_ok());
+
+    let found_security = result.unwrap();
+    assert!(found_security.is_some());
+    assert_eq!(security, found_security.unwrap());
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[traced_test]
+#[tokio::test]
+async fn find_security_with_ticker_and_one_match_works(
+    #[future] test_db_conn: Result<DbConnection>,
+    security: Security,
+) -> Result<()> {
+    let dbc = test_db_conn?;
+    insert_security(&dbc.db, &security).await?;
+
+    let result = find_security_by_ticker(&dbc.db, &security.ticker).await;
+    assert!(result.is_ok());
+
+    let found_securities = result.unwrap();
+    assert_eq!(found_securities.len(), 1);
+    assert_eq!(security, found_securities[0]);
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[traced_test]
+#[tokio::test]
+async fn find_non_extant_security_with_ticker_returns_zero_elements(
+    #[future] test_db_conn: Result<DbConnection>,
+    security: Security,
+) -> Result<()> {
+    let dbc = test_db_conn?;
+
+    let result = find_security_by_ticker(&dbc.db, &security.ticker).await;
+    assert!(result.is_ok());
+
+    let found_securities = result.unwrap();
+    assert_eq!(found_securities.len(), 0);
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[traced_test]
+#[tokio::test]
+async fn find_security_with_ticker_and_two_match_works(
+    #[future] test_db_conn: Result<DbConnection>,
+    security: Security,
+) -> Result<()> {
+    let dbc = test_db_conn?;
+    insert_security(&dbc.db, &security).await?;
+
+    let security2 = Security {
+        _id: bson::oid::ObjectId::new(),
+        ticker: security.ticker.clone(),
+        listing_exchange: "NYSE".to_string(),
+        security_type: SecurityType::Stock,
+        ibkr_conid: None,
+    };
+    insert_security(&dbc.db, &security2).await?;
+
+    let result = find_security_by_ticker(&dbc.db, &security.ticker).await;
+    assert!(result.is_ok());
+
+    let found_securities = result.unwrap();
+    assert_eq!(found_securities.len(), 2);
+    assert!(found_securities.contains(&security));
+    assert!(found_securities.contains(&security2));
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[traced_test]
+#[tokio::test]
+async fn find_security_by_conid_works(
+    #[future] test_db_conn: Result<DbConnection>,
+    security_with_conid: Security,
+) -> Result<()> {
+    let dbc = test_db_conn?;
+    insert_security(&dbc.db, &security_with_conid).await?;
+
+    let result = find_security_by_conid(&dbc.db, security_with_conid.ibkr_conid.unwrap()).await;
+    assert!(result.is_ok());
+
+    let found_security = result.unwrap();
+    assert!(found_security.is_some());
+    assert_eq!(security_with_conid, found_security.unwrap());
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[traced_test]
+#[tokio::test]
+async fn find_non_extant_security_by_conid_fails(
+    #[future] test_db_conn: Result<DbConnection>,
+    security_with_conid: Security,
+) -> Result<()> {
+    let dbc = test_db_conn?;
+
+    let result = find_security_by_conid(&dbc.db, security_with_conid.ibkr_conid.unwrap()).await;
+    assert!(result.is_ok());
+
+    let found_security = result.unwrap();
+    assert!(found_security.is_none());
 
     Ok(())
 }

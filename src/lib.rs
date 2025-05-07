@@ -8,6 +8,8 @@ mod migrations;
 
 use account::BrokerageAccount;
 use anyhow::Result;
+use bson::doc;
+use futures::stream::TryStreamExt;
 use mongodb::Database;
 use security::Security;
 use tfiala_mongodb_migrator::migrator::default::DefaultMigrator;
@@ -48,4 +50,32 @@ pub async fn insert_security(db: &Database, security: &Security) -> Result<()> {
         result.inserted_id
     );
     Ok(())
+}
+
+pub async fn find_security(
+    db: &Database,
+    ticker: &str,
+    listing_exchange: &str,
+) -> Result<Option<Security>> {
+    Ok(db
+        .collection::<Security>(Security::COLLECTION_NAME)
+        .find_one(doc! { "ticker": ticker, "listing_exchange": listing_exchange })
+        .await?)
+}
+
+pub async fn find_security_by_conid(db: &Database, ibkr_conid: u32) -> Result<Option<Security>> {
+    Ok(db
+        .collection::<Security>(Security::COLLECTION_NAME)
+        .find_one(doc! { "ibkr_conid": ibkr_conid })
+        .await?)
+}
+
+pub async fn find_security_by_ticker(db: &Database, ticker: &str) -> Result<Vec<Security>> {
+    let result = db
+        .collection::<Security>(Security::COLLECTION_NAME)
+        .find(doc! { "ticker": ticker })
+        .await?;
+
+    // Convert the cursor to a vector of Security objects.
+    Ok(result.try_collect().await?)
 }
