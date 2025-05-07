@@ -33,13 +33,13 @@ async fn main() -> Result<()> {
 
 ## Roadmap
 
-* [ ] Support basic CRUD operations on brokerage domain items.
-      * [x] support securities
-      * [x] support minimal brokerage account data (account id, brokerage name)
-      * [ ] support trade executions
+### Basic CRUD operations
+* [x] support securities
+* [x] support minimal brokerage account data (account id, brokerage name)
+* [ ] support trade executions
 
-* [ ] Support brokerage data sourced from InteractiveBrokers (IBKR) Flex-based report queries 
-      imported via [ibkr-flex-statement](https://github.com/tfiala/ibkr-flex-statement-rs).
-      * [ ] brokerage account info
-      * [ ] trade executions
-      * [ ] end-of-day account balance
+### Data sourced from InteractiveBrokers (IBKR) Flex-based report queries 
+Imported via [ibkr-flex-statement](https://github.com/tfiala/ibkr-flex-statement-rs).
+* [ ] brokerage account info
+* [ ] trade executions
+* [ ] end-of-day account balance
