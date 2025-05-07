@@ -1,6 +1,9 @@
 use anyhow::Result;
 use brokerage_db::{account::BrokerageAccount, insert_brokerage_account, run_migrations};
-use mongodb::{Client, Database};
+use mongodb::{
+    Client, Database,
+    error::{Error, ErrorKind, WriteFailure},
+};
 use rstest::{fixture, rstest};
 use testcontainers_modules::{
     mongo::Mongo,
@@ -98,10 +101,36 @@ async fn insert_one_brokerage_account_works(
         .await?
         .ok_or_else(|| anyhow::anyhow!("Brokerage account not found"))?;
 
-    // assert_eq!(found_account.brokerage_id, brokerage_account.brokerage_id);
-    // assert_eq!(found_account.account_id, brokerage_account.account_id);
-    // assert_eq!(found_account._id, brokerage_account._id);
     assert_eq!(brokerage_account, found_account);
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[traced_test]
+#[tokio::test]
+async fn insert_same_brokerage_account_twice_fails(
+    #[future] test_db_conn: Result<DbConnection>,
+    brokerage_account: BrokerageAccount,
+) -> Result<()> {
+    let dbc = test_db_conn?;
+
+    // Insert it once.
+    insert_brokerage_account(&dbc.db, &brokerage_account).await?;
+    let result = insert_brokerage_account(&dbc.db, &brokerage_account).await;
+
+    assert!(result.is_err());
+
+    let expected_error = result.unwrap_err().downcast::<Error>();
+    assert!(expected_error.is_ok());
+    let kind = expected_error.unwrap().kind;
+    match *kind {
+        ErrorKind::Write(WriteFailure::WriteError(write_error)) => {
+            assert_eq!(write_error.code, 11000);
+        }
+        _ => panic!("Expected a WriteError with code 11000"),
+    }
 
     Ok(())
 }
