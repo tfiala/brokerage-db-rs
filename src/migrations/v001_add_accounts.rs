@@ -15,7 +15,8 @@ impl tfiala_mongodb_migrator::migration::Migration for Migration {
         //
         // Create initial brokerage-accounts indexes.
         //
-        let account_collection = db.collection::<BrokerageAccount>("brokerage-accounts");
+        let account_collection =
+            db.collection::<BrokerageAccount>(BrokerageAccount::COLLECTION_NAME);
         let indexes = vec![
             IndexModel::builder()
                 .keys(doc! { "brokerage_id": 1, "account_id": 1 })
@@ -35,7 +36,8 @@ impl tfiala_mongodb_migrator::migration::Migration for Migration {
 
     async fn down(&self, env: Env) -> Result<()> {
         let db = env.db.unwrap();
-        let account_collection = db.collection::<BrokerageAccount>("brokerage-accounts");
+        let account_collection =
+            db.collection::<BrokerageAccount>(BrokerageAccount::COLLECTION_NAME);
 
         let _result = account_collection
             .drop_index("brokerage-account-unique-idx")
