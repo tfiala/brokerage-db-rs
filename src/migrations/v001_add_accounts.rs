@@ -22,7 +22,7 @@ impl tfiala_mongodb_migrator::migration::Migration for Migration {
                 .keys(doc! { "brokerage_id": 1, "account_id": 1 })
                 .options(
                     IndexOptions::builder()
-                        .name(Some("brokerage-account-unique-idx".to_owned()))
+                        .name(Some("brokerage_account_unique_idx".to_owned()))
                         .unique(true)
                         .build(),
                 )
@@ -40,7 +40,7 @@ impl tfiala_mongodb_migrator::migration::Migration for Migration {
             db.collection::<BrokerageAccount>(BrokerageAccount::COLLECTION_NAME);
 
         let _result = account_collection
-            .drop_index("brokerage-account-unique-idx")
+            .drop_index("brokerage_account_unique_idx")
             .await?;
 
         Ok(())

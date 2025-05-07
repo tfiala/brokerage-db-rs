@@ -20,7 +20,7 @@ pub async fn run_migrations(db: Database) -> Result<()> {
     Ok(())
 }
 
-pub async fn write_brokerage_account(
+pub async fn insert_brokerage_account(
     db: &Database,
     brokerage_account: &BrokerageAccount,
 ) -> Result<()> {

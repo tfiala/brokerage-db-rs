@@ -1,5 +1,5 @@
 use anyhow::Result;
-use brokerage_db::run_migrations;
+use brokerage_db::{account::BrokerageAccount, insert_brokerage_account, run_migrations};
 use mongodb::{Client, Database};
 use rstest::{fixture, rstest};
 use testcontainers_modules::{
@@ -28,13 +28,29 @@ impl DbConnection {
 }
 
 #[fixture]
-async fn test_db_conn() -> Result<DbConnection> {
+async fn empty_test_db_conn() -> Result<DbConnection> {
     DbConnection::new("test").await
+}
+
+#[fixture]
+async fn test_db_conn() -> Result<DbConnection> {
+    let db_conn = DbConnection::new("test").await?;
+    run_migrations(db_conn.db.clone()).await?;
+    Ok(db_conn)
 }
 
 #[fixture]
 async fn admin_db_conn() -> Result<DbConnection> {
     DbConnection::new("admin").await
+}
+
+#[fixture]
+fn brokerage_account() -> BrokerageAccount {
+    BrokerageAccount {
+        _id: bson::oid::ObjectId::new(),
+        brokerage_id: "batch-brokers".to_string(),
+        account_id: "A1234567".to_string(),
+    }
 }
 
 #[rstest]
@@ -57,7 +73,35 @@ async fn test_mongodb_container_connection(
 #[awt]
 #[traced_test]
 #[tokio::test]
-async fn test_migration_succeeds(#[future] test_db_conn: Result<DbConnection>) -> Result<()> {
-    run_migrations(test_db_conn.unwrap().db.clone()).await?;
+async fn test_migration_succeeds(#[future] empty_test_db_conn: Result<DbConnection>) -> Result<()> {
+    run_migrations(empty_test_db_conn.unwrap().db.clone()).await?;
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[traced_test]
+#[tokio::test]
+async fn insert_one_brokerage_account_works(
+    #[future] test_db_conn: Result<DbConnection>,
+    brokerage_account: BrokerageAccount,
+) -> Result<()> {
+    let dbc = test_db_conn?;
+    insert_brokerage_account(&dbc.db, &brokerage_account).await?;
+
+    let found_account = dbc
+        .db
+        .collection::<BrokerageAccount>(BrokerageAccount::COLLECTION_NAME)
+        .find_one(bson::doc! {
+        "brokerage_id": brokerage_account.brokerage_id.clone(),
+        "account_id": brokerage_account.account_id.clone() })
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Brokerage account not found"))?;
+
+    // assert_eq!(found_account.brokerage_id, brokerage_account.brokerage_id);
+    // assert_eq!(found_account.account_id, brokerage_account.account_id);
+    // assert_eq!(found_account._id, brokerage_account._id);
+    assert_eq!(brokerage_account, found_account);
+
     Ok(())
 }
