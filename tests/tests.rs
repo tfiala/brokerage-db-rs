@@ -60,58 +60,32 @@ async fn admin_db_conn() -> Result<DbConnection> {
 
 #[fixture]
 fn brokerage_account() -> BrokerageAccount {
-    BrokerageAccount {
-        _id: bson::oid::ObjectId::new(),
-        brokerage_id: "batch-brokers".to_string(),
-        account_id: "A1234567".to_string(),
-    }
+    BrokerageAccount::new("batch-brokers", "A1234567")
 }
 
 #[fixture]
 fn security() -> Security {
-    Security {
-        _id: bson::oid::ObjectId::new(),
-        ticker: "AAPL".to_string(),
-        listing_exchange: "NASDAQ".to_string(),
-        security_type: SecurityType::Stock,
-        ibkr_conid: None,
-    }
+    Security::new(SecurityType::Stock, "AAPL", "NASDAQ", None)
 }
 
 #[fixture]
 fn security_with_conid() -> Security {
-    Security {
-        _id: bson::oid::ObjectId::new(),
-        ticker: "TSLA".to_string(),
-        listing_exchange: "NASDAQ".to_string(),
-        security_type: SecurityType::Stock,
-        ibkr_conid: Some(12345678),
-    }
+    Security::new(SecurityType::Stock, "AAPL", "NASDAQ", Some(12345678))
 }
 
 #[fixture]
 fn trade_execution_desc() -> TradeExecutionDesc {
-    let security = Security {
-        _id: bson::oid::ObjectId::new(),
-        ticker: "AAPL".to_string(),
-        listing_exchange: "NASDAQ".to_string(),
-        security_type: SecurityType::Stock,
-        ibkr_conid: None,
-    };
-    let brokerage_account = BrokerageAccount {
-        _id: bson::oid::ObjectId::new(),
-        brokerage_id: "batch-brokers".to_string(),
-        account_id: "A1234567".to_string(),
-    };
+    let security = Security::new(SecurityType::Stock, "AAPL", "NASDAQ", None);
+    let brokerage_account = BrokerageAccount::new("batch-brokers", "A1234567");
     let trade_execution = TradeExecution {
         _id: bson::oid::ObjectId::new(),
-        brokerage_account_id: brokerage_account._id,
+        brokerage_account_id: brokerage_account.get_id(),
         brokerage_execution_id: "abc-123-def".to_owned(),
         commission: 0.0,
         execution_timestamp_ms: 1746665451000,
         quantity: 100,
         price: 150.0,
-        security_id: security._id,
+        security_id: security.get_id(),
         side: TradeSide::Buy,
     };
 
@@ -176,8 +150,8 @@ async fn insert_brokerage_account_works(
         .db
         .collection::<BrokerageAccount>(BrokerageAccount::COLLECTION_NAME)
         .find_one(bson::doc! {
-        "brokerage_id": brokerage_account.brokerage_id.clone(),
-        "account_id": brokerage_account.account_id.clone() })
+        "brokerage_id": brokerage_account.get_brokerage_id(),
+        "account_id": brokerage_account.get_account_id() })
         .await?
         .ok_or_else(|| anyhow::anyhow!("Brokerage account not found"))?;
 
@@ -229,8 +203,8 @@ async fn insert_security_works(
 
     let found_security = Security::find_by_ticker_and_exchange(
         &dbc.db,
-        &security.ticker,
-        &security.listing_exchange,
+        security.get_ticker(),
+        security.get_listing_exchange(),
     )
     .await?;
 
@@ -255,8 +229,8 @@ async fn insert_security_with_conid_works(
         .db
         .collection::<Security>(Security::COLLECTION_NAME)
         .find_one(bson::doc! {
-        "ticker": security_with_conid.ticker.clone(),
-        "listing_exchange": security_with_conid.listing_exchange.clone() })
+        "ticker": security_with_conid.get_ticker(),
+        "listing_exchange": security_with_conid.get_listing_exchange() })
         .await?
         .ok_or_else(|| anyhow::anyhow!("Security not found"))?;
 
@@ -276,8 +250,8 @@ async fn find_non_extant_security_fails(
     let dbc = test_db_conn?;
     let result = Security::find_by_ticker_and_exchange(
         &dbc.db,
-        &security.ticker,
-        &security.listing_exchange,
+        security.get_ticker(),
+        security.get_listing_exchange(),
     )
     .await;
 
@@ -300,8 +274,8 @@ async fn find_security_with_ticker_and_exchange_works(
 
     let result = Security::find_by_ticker_and_exchange(
         &dbc.db,
-        &security.ticker,
-        &security.listing_exchange,
+        security.get_ticker(),
+        security.get_listing_exchange(),
     )
     .await;
     assert!(result.is_ok());
@@ -324,7 +298,7 @@ async fn find_security_with_ticker_and_one_match_works(
     let dbc = test_db_conn?;
     security.insert(&dbc.db, None).await?;
 
-    let result = Security::find_by_ticker(&dbc.db, &security.ticker).await;
+    let result = Security::find_by_ticker(&dbc.db, security.get_ticker()).await;
     assert!(result.is_ok());
 
     let found_securities = result.unwrap();
@@ -344,7 +318,7 @@ async fn find_non_extant_security_with_ticker_returns_zero_elements(
 ) -> Result<()> {
     let dbc = test_db_conn?;
 
-    let result = Security::find_by_ticker(&dbc.db, &security.ticker).await;
+    let result = Security::find_by_ticker(&dbc.db, security.get_ticker()).await;
     assert!(result.is_ok());
 
     let found_securities = result.unwrap();
@@ -364,16 +338,10 @@ async fn find_security_with_ticker_and_two_match_works(
     let dbc = test_db_conn?;
     security.insert(&dbc.db, None).await?;
 
-    let security2 = Security {
-        _id: bson::oid::ObjectId::new(),
-        ticker: security.ticker.clone(),
-        listing_exchange: "NYSE".to_string(),
-        security_type: SecurityType::Stock,
-        ibkr_conid: None,
-    };
+    let security2 = Security::new(SecurityType::Stock, security.get_ticker(), "NYSE", None);
     security2.insert(&dbc.db, None).await?;
 
-    let result = Security::find_by_ticker(&dbc.db, &security.ticker).await;
+    let result = Security::find_by_ticker(&dbc.db, security.get_ticker()).await;
     assert!(result.is_ok());
 
     let found_securities = result.unwrap();
@@ -395,7 +363,8 @@ async fn find_security_by_conid_works(
     let dbc = test_db_conn?;
     security_with_conid.insert(&dbc.db, None).await?;
 
-    let result = Security::find_by_conid(&dbc.db, security_with_conid.ibkr_conid.unwrap()).await;
+    let result =
+        Security::find_by_conid(&dbc.db, security_with_conid.get_ibkr_conid().unwrap()).await;
     assert!(result.is_ok());
 
     let found_security = result.unwrap();
@@ -415,7 +384,8 @@ async fn find_non_extant_security_by_conid_fails(
 ) -> Result<()> {
     let dbc = test_db_conn?;
 
-    let result = Security::find_by_conid(&dbc.db, security_with_conid.ibkr_conid.unwrap()).await;
+    let result =
+        Security::find_by_conid(&dbc.db, security_with_conid.get_ibkr_conid().unwrap()).await;
     assert!(result.is_ok());
 
     let found_security = result.unwrap();

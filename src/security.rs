@@ -12,15 +12,50 @@ pub enum SecurityType {
 }
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Security {
-    pub _id: bson::oid::ObjectId,
-    pub listing_exchange: String,
-    pub security_type: SecurityType,
-    pub ticker: String,
-    pub ibkr_conid: Option<u32>,
+    _id: bson::oid::ObjectId,
+    listing_exchange: String,
+    security_type: SecurityType,
+    ticker: String,
+    ibkr_conid: Option<u32>,
 }
 
 impl Security {
     pub const COLLECTION_NAME: &'static str = "securities";
+
+    pub fn new(
+        security_type: SecurityType,
+        ticker: &str,
+        listing_exchange: &str,
+        ibkr_conid: Option<u32>,
+    ) -> Self {
+        Self {
+            _id: ObjectId::new(),
+            listing_exchange: listing_exchange.to_owned(),
+            security_type,
+            ticker: ticker.to_owned(),
+            ibkr_conid,
+        }
+    }
+
+    pub fn get_id(&self) -> ObjectId {
+        self._id
+    }
+
+    pub fn get_listing_exchange(&self) -> &str {
+        &self.listing_exchange
+    }
+
+    pub fn get_security_type(&self) -> &SecurityType {
+        &self.security_type
+    }
+
+    pub fn get_ticker(&self) -> &str {
+        &self.ticker
+    }
+
+    pub fn get_ibkr_conid(&self) -> Option<u32> {
+        self.ibkr_conid
+    }
 
     pub async fn insert(&self, db: &Database, session: Option<&mut ClientSession>) -> Result<()> {
         db_util::insert(self, db, Self::COLLECTION_NAME, session).await

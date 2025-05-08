@@ -8,13 +8,33 @@ use crate::db_util;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct BrokerageAccount {
-    pub _id: ObjectId,
-    pub brokerage_id: String,
-    pub account_id: String,
+    _id: ObjectId,
+    brokerage_id: String,
+    account_id: String,
 }
 
 impl BrokerageAccount {
     pub const COLLECTION_NAME: &'static str = "brokerage_accounts";
+
+    pub fn new(brokerage_id: &str, account_id: &str) -> Self {
+        Self {
+            _id: ObjectId::new(),
+            brokerage_id: brokerage_id.to_owned(),
+            account_id: account_id.to_owned(),
+        }
+    }
+
+    pub fn get_id(&self) -> ObjectId {
+        self._id
+    }
+
+    pub fn get_brokerage_id(&self) -> &str {
+        &self.brokerage_id
+    }
+
+    pub fn get_account_id(&self) -> &str {
+        &self.account_id
+    }
 
     pub async fn insert(&self, db: &Database, session: Option<&mut ClientSession>) -> Result<()> {
         db_util::insert(self, db, Self::COLLECTION_NAME, session).await
