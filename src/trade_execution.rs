@@ -12,11 +12,13 @@ pub enum TradeSide {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TradeExecution {
     pub _id: bson::oid::ObjectId,
-    pub brokerage_account: bson::oid::ObjectId,
+    pub brokerage_account_id: bson::oid::ObjectId,
+    pub brokerage_execution_id: String,
+    pub execution_timestamp_ms: i64,
     pub commission: f64,
     pub quantity: u64,
     pub price: f64,
-    pub security: bson::oid::ObjectId,
+    pub security_id: bson::oid::ObjectId,
     pub side: TradeSide,
 }
 
@@ -45,13 +47,13 @@ impl TradeExecution {
         Ok(result)
     }
 
-    pub async fn get_brokerage_account(&self, db: &Database) -> Result<BrokerageAccount> {
-        Ok(BrokerageAccount::find_by_id(db, self.brokerage_account)
+    pub async fn brokerage_account(&self, db: &Database) -> Result<BrokerageAccount> {
+        Ok(BrokerageAccount::find_by_id(db, self.brokerage_account_id)
             .await?
             .unwrap())
     }
 
-    pub async fn get_security(&self, db: &Database) -> Result<Security> {
-        Ok(Security::find_by_id(db, self.security).await?.unwrap())
+    pub async fn security(&self, db: &Database) -> Result<Security> {
+        Ok(Security::find_by_id(db, self.security_id).await?.unwrap())
     }
 }

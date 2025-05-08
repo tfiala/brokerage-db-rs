@@ -3,6 +3,7 @@ use brokerage_db::{
     account::BrokerageAccount,
     initialize,
     security::{Security, SecurityType},
+    trade_execution::{TradeExecution, TradeSide},
 };
 use mongodb::{
     Client, Database,
@@ -32,6 +33,12 @@ impl DbConnection {
 
         Ok(DbConnection { client, db, node })
     }
+}
+
+struct TradeExecutionDesc {
+    pub security: Security,
+    pub brokerage_account: BrokerageAccount,
+    pub trade_execution: TradeExecution,
 }
 
 #[fixture]
@@ -79,6 +86,39 @@ fn security_with_conid() -> Security {
         listing_exchange: "NASDAQ".to_string(),
         security_type: SecurityType::Stock,
         ibkr_conid: Some(12345678),
+    }
+}
+
+#[fixture]
+fn trade_execution_desc() -> TradeExecutionDesc {
+    let security = Security {
+        _id: bson::oid::ObjectId::new(),
+        ticker: "AAPL".to_string(),
+        listing_exchange: "NASDAQ".to_string(),
+        security_type: SecurityType::Stock,
+        ibkr_conid: None,
+    };
+    let brokerage_account = BrokerageAccount {
+        _id: bson::oid::ObjectId::new(),
+        brokerage_id: "batch-brokers".to_string(),
+        account_id: "A1234567".to_string(),
+    };
+    let trade_execution = TradeExecution {
+        _id: bson::oid::ObjectId::new(),
+        brokerage_account_id: brokerage_account._id.clone(),
+        brokerage_execution_id: "abc-123-def".to_owned(),
+        commission: 0.0,
+        execution_timestamp_ms: 1746665451000,
+        quantity: 100,
+        price: 150.0,
+        security_id: security._id.clone(),
+        side: TradeSide::Buy,
+    };
+
+    TradeExecutionDesc {
+        security,
+        brokerage_account,
+        trade_execution,
     }
 }
 
@@ -366,6 +406,40 @@ async fn find_non_extant_security_by_conid_fails(
 
     let found_security = result.unwrap();
     assert!(found_security.is_none());
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[traced_test]
+#[tokio::test]
+async fn insert_trade_execution_works(
+    #[future] test_db_conn: Result<DbConnection>,
+    trade_execution_desc: TradeExecutionDesc,
+) -> Result<()> {
+    let dbc = test_db_conn?;
+
+    // Insert the brokerage account and security first.
+    trade_execution_desc
+        .brokerage_account
+        .insert(&dbc.db)
+        .await?;
+    trade_execution_desc.security.insert(&dbc.db).await?;
+
+    // Now insert the trade execution.
+    trade_execution_desc.trade_execution.insert(&dbc.db).await?;
+
+    // let found_security = dbc
+    //     .db
+    //     .collection::<Security>(Security::COLLECTION_NAME)
+    //     .find_one(bson::doc! {
+    //     "ticker": security_with_conid.ticker.clone(),
+    //     "listing_exchange": security_with_conid.listing_exchange.clone() })
+    //     .await?
+    //     .ok_or_else(|| anyhow::anyhow!("Security not found"))?;
+
+    // assert_eq!(security_with_conid, found_security);
 
     Ok(())
 }

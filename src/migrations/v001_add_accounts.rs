@@ -7,6 +7,8 @@ use tfiala_mongodb_migrator::migrator::Env;
 
 pub struct Migration001 {}
 
+const BROKERAGE_ACCOUNT_UNIQUE_INDEX_NAME: &str = "brokerage_account_unique_idx";
+
 #[async_trait]
 impl tfiala_mongodb_migrator::migration::Migration for Migration001 {
     async fn up(&self, env: Env) -> Result<()> {
@@ -22,7 +24,7 @@ impl tfiala_mongodb_migrator::migration::Migration for Migration001 {
                 .keys(doc! { "brokerage_id": 1, "account_id": 1 })
                 .options(
                     IndexOptions::builder()
-                        .name(Some("brokerage_account_unique_idx".to_owned()))
+                        .name(Some(BROKERAGE_ACCOUNT_UNIQUE_INDEX_NAME.to_owned()))
                         .unique(true)
                         .build(),
                 )
@@ -40,7 +42,7 @@ impl tfiala_mongodb_migrator::migration::Migration for Migration001 {
             db.collection::<BrokerageAccount>(BrokerageAccount::COLLECTION_NAME);
 
         let _result = account_collection
-            .drop_index("brokerage_account_unique_idx")
+            .drop_index(BROKERAGE_ACCOUNT_UNIQUE_INDEX_NAME)
             .await?;
 
         Ok(())

@@ -6,12 +6,11 @@
 
 Database management for trader brokerage data with a MongoDB backend.
 
-
 ## Setup
 
 ```toml
 [dependencies]
-brokerage-db = "0.1.4"
+brokerage-db = "0.2.0"
 ```
 
 ## Functionality
@@ -34,12 +33,15 @@ async fn main() -> Result<()> {
 ## Roadmap
 
 ### Basic CRUD operations
+
 * [x] support securities
 * [x] support minimal brokerage account data (account id, brokerage name)
 * [ ] support trade executions
 
-### Data sourced from InteractiveBrokers (IBKR) Flex-based report queries 
+### Data sourced from InteractiveBrokers (IBKR) Flex-based report queries
+
 Imported via [ibkr-flex-statement](https://github.com/tfiala/ibkr-flex-statement-rs).
+
 * [ ] brokerage account info
 * [ ] trade executions
 * [ ] end-of-day account balance
