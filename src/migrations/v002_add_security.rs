@@ -18,7 +18,9 @@ impl tfiala_mongodb_migrator::migration::Migration for Migration002 {
         //
         // Create initial security (stock, bond, option, etc.) collection
         //
-        let account_collection = db.collection::<Security>(Security::COLLECTION_NAME);
+        db.create_collection(Security::COLLECTION_NAME).await?;
+
+        let collection = db.collection::<Security>(Security::COLLECTION_NAME);
         let indexes = vec![
             IndexModel::builder()
                 .keys(doc! { "ticker": 1, "listing_exchange": 1 })
@@ -39,22 +41,22 @@ impl tfiala_mongodb_migrator::migration::Migration for Migration002 {
                 .build(),
         ];
 
-        let _result = account_collection.create_indexes(indexes).await?;
+        collection.create_indexes(indexes).await?;
 
         Ok(())
     }
 
     async fn down(&self, env: Env) -> Result<()> {
         let db = env.db.unwrap();
-        let account_collection = db.collection::<Security>(Security::COLLECTION_NAME);
+        let collection = db.collection::<Security>(Security::COLLECTION_NAME);
 
-        account_collection
+        collection
             .drop_index(SECURITIES_IBKR_CONID_INDEX_NAME)
             .await?;
 
-        account_collection
-            .drop_index(SECURITIES_UNIQUE_INDEX_NAME)
-            .await?;
+        collection.drop_index(SECURITIES_UNIQUE_INDEX_NAME).await?;
+
+        collection.drop().await?;
 
         Ok(())
     }
