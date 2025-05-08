@@ -1,7 +1,7 @@
 use anyhow::Result;
 use brokerage_db::{
     account::BrokerageAccount,
-    initialize,
+    initialize, remove_data,
     security::{Security, SecurityType},
     trade_execution::{TradeExecution, TradeSide},
 };
@@ -144,6 +144,20 @@ async fn test_mongodb_container_connection(
 #[tokio::test]
 async fn test_migration_succeeds(#[future] empty_test_db_conn: Result<DbConnection>) -> Result<()> {
     initialize(&empty_test_db_conn.unwrap().db).await?;
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[traced_test]
+#[tokio::test]
+async fn test_down_migration_succeeds(
+    #[future] empty_test_db_conn: Result<DbConnection>,
+) -> Result<()> {
+    let dbc = empty_test_db_conn?;
+
+    initialize(&dbc.db).await?;
+    remove_data(&dbc.db).await?;
     Ok(())
 }
 
@@ -430,16 +444,29 @@ async fn insert_trade_execution_works(
     // Now insert the trade execution.
     trade_execution_desc.trade_execution.insert(&dbc.db).await?;
 
-    // let found_security = dbc
-    //     .db
-    //     .collection::<Security>(Security::COLLECTION_NAME)
-    //     .find_one(bson::doc! {
-    //     "ticker": security_with_conid.ticker.clone(),
-    //     "listing_exchange": security_with_conid.listing_exchange.clone() })
-    //     .await?
-    //     .ok_or_else(|| anyhow::anyhow!("Security not found"))?;
+    let found_trade_execution =
+        TradeExecution::find_by_id(&dbc.db, trade_execution_desc.trade_execution._id).await?;
+    assert!(found_trade_execution.is_some());
+    assert_eq!(
+        trade_execution_desc.trade_execution,
+        found_trade_execution.unwrap()
+    );
 
-    // assert_eq!(security_with_conid, found_security);
+    // Check that the trade execution is linked to the correct brokerage account and security.
+    let found_brokerage_account = BrokerageAccount::find_by_id(
+        &dbc.db,
+        trade_execution_desc.trade_execution.brokerage_account_id,
+    )
+    .await?;
+    assert!(found_brokerage_account.is_some());
+    assert_eq!(
+        trade_execution_desc.brokerage_account,
+        found_brokerage_account.unwrap()
+    );
+    let found_security =
+        Security::find_by_id(&dbc.db, trade_execution_desc.trade_execution.security_id).await?;
+    assert!(found_security.is_some());
+    assert_eq!(trade_execution_desc.security, found_security.unwrap());
 
     Ok(())
 }

@@ -4,12 +4,12 @@ use bson::oid::ObjectId;
 use mongodb::Database;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum TradeSide {
     Buy,
     Sell,
 }
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct TradeExecution {
     pub _id: bson::oid::ObjectId,
     pub brokerage_account_id: bson::oid::ObjectId,

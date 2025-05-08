@@ -22,3 +22,13 @@ pub async fn run_migrations(db: &Database) -> Result<()> {
         .await?;
     Ok(())
 }
+
+pub async fn run_down_migrations(db: &Database) -> Result<()> {
+    DefaultMigrator::new()
+        .with_conn(db.clone())
+        .with_migrations_vec(get_migrations())
+        .down()
+        .await?;
+
+    Ok(())
+}
