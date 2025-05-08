@@ -105,13 +105,13 @@ fn trade_execution_desc() -> TradeExecutionDesc {
     };
     let trade_execution = TradeExecution {
         _id: bson::oid::ObjectId::new(),
-        brokerage_account_id: brokerage_account._id.clone(),
+        brokerage_account_id: brokerage_account._id,
         brokerage_execution_id: "abc-123-def".to_owned(),
         commission: 0.0,
         execution_timestamp_ms: 1746665451000,
         quantity: 100,
         price: 150.0,
-        security_id: security._id.clone(),
+        security_id: security._id,
         side: TradeSide::Buy,
     };
 
