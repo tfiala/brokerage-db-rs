@@ -1,7 +1,10 @@
 use anyhow::Result;
 use bson::oid::ObjectId;
-use mongodb::Database;
+use mongodb::{ClientSession, Database};
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
+
+use crate::db_util;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct BrokerageAccount {
@@ -13,17 +16,8 @@ pub struct BrokerageAccount {
 impl BrokerageAccount {
     pub const COLLECTION_NAME: &'static str = "brokerage_accounts";
 
-    pub async fn insert(&self, db: &Database) -> Result<()> {
-        let result = db
-            .collection::<Self>(Self::COLLECTION_NAME)
-            .insert_one(self)
-            .await?;
-        tracing::info!(
-            "inserted brokerage-account {:?}: (reported insert id: {:?})",
-            self,
-            result.inserted_id
-        );
-        Ok(())
+    pub async fn insert(&self, db: &Database, session: Option<&mut ClientSession>) -> Result<()> {
+        db_util::insert(self, db, Self::COLLECTION_NAME, session).await
     }
 
     pub async fn find_by_brokerage_and_account_id(

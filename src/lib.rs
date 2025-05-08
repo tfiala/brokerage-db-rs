@@ -4,6 +4,7 @@ pub mod security;
 pub mod trade_execution;
 
 // Internal modules.
+mod db_util;
 mod migrations;
 
 use anyhow::Result;

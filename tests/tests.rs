@@ -170,7 +170,7 @@ async fn insert_brokerage_account_works(
     brokerage_account: BrokerageAccount,
 ) -> Result<()> {
     let dbc = test_db_conn?;
-    brokerage_account.insert(&dbc.db).await?;
+    brokerage_account.insert(&dbc.db, None).await?;
 
     let found_account = dbc
         .db
@@ -197,9 +197,9 @@ async fn insert_duplicate_brokerage_account_fails(
     let dbc = test_db_conn?;
 
     // Insert it once.
-    brokerage_account.insert(&dbc.db).await?;
+    brokerage_account.insert(&dbc.db, None).await?;
     // And again.
-    let result = brokerage_account.insert(&dbc.db).await;
+    let result = brokerage_account.insert(&dbc.db, None).await;
 
     assert!(result.is_err());
 
@@ -225,7 +225,7 @@ async fn insert_security_works(
     security: Security,
 ) -> Result<()> {
     let dbc = test_db_conn?;
-    security.insert(&dbc.db).await?;
+    security.insert(&dbc.db, None).await?;
 
     let found_security = Security::find_by_ticker_and_exchange(
         &dbc.db,
@@ -249,7 +249,7 @@ async fn insert_security_with_conid_works(
     security_with_conid: Security,
 ) -> Result<()> {
     let dbc = test_db_conn?;
-    security_with_conid.insert(&dbc.db).await?;
+    security_with_conid.insert(&dbc.db, None).await?;
 
     let found_security = dbc
         .db
@@ -296,7 +296,7 @@ async fn find_security_with_ticker_and_exchange_works(
     security: Security,
 ) -> Result<()> {
     let dbc = test_db_conn?;
-    security.insert(&dbc.db).await?;
+    security.insert(&dbc.db, None).await?;
 
     let result = Security::find_by_ticker_and_exchange(
         &dbc.db,
@@ -322,7 +322,7 @@ async fn find_security_with_ticker_and_one_match_works(
     security: Security,
 ) -> Result<()> {
     let dbc = test_db_conn?;
-    security.insert(&dbc.db).await?;
+    security.insert(&dbc.db, None).await?;
 
     let result = Security::find_by_ticker(&dbc.db, &security.ticker).await;
     assert!(result.is_ok());
@@ -362,7 +362,7 @@ async fn find_security_with_ticker_and_two_match_works(
     security: Security,
 ) -> Result<()> {
     let dbc = test_db_conn?;
-    security.insert(&dbc.db).await?;
+    security.insert(&dbc.db, None).await?;
 
     let security2 = Security {
         _id: bson::oid::ObjectId::new(),
@@ -371,7 +371,7 @@ async fn find_security_with_ticker_and_two_match_works(
         security_type: SecurityType::Stock,
         ibkr_conid: None,
     };
-    security2.insert(&dbc.db).await?;
+    security2.insert(&dbc.db, None).await?;
 
     let result = Security::find_by_ticker(&dbc.db, &security.ticker).await;
     assert!(result.is_ok());
@@ -393,7 +393,7 @@ async fn find_security_by_conid_works(
     security_with_conid: Security,
 ) -> Result<()> {
     let dbc = test_db_conn?;
-    security_with_conid.insert(&dbc.db).await?;
+    security_with_conid.insert(&dbc.db, None).await?;
 
     let result = Security::find_by_conid(&dbc.db, security_with_conid.ibkr_conid.unwrap()).await;
     assert!(result.is_ok());
@@ -437,12 +437,15 @@ async fn insert_trade_execution_works(
     // Insert the brokerage account and security first.
     trade_execution_desc
         .brokerage_account
-        .insert(&dbc.db)
+        .insert(&dbc.db, None)
         .await?;
-    trade_execution_desc.security.insert(&dbc.db).await?;
+    trade_execution_desc.security.insert(&dbc.db, None).await?;
 
     // Now insert the trade execution.
-    trade_execution_desc.trade_execution.insert(&dbc.db).await?;
+    trade_execution_desc
+        .trade_execution
+        .insert(&dbc.db, None)
+        .await?;
 
     let found_trade_execution =
         TradeExecution::find_by_id(&dbc.db, trade_execution_desc.trade_execution._id).await?;

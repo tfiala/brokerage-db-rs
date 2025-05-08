@@ -1,8 +1,10 @@
 use anyhow::Result;
 use bson::{doc, oid::ObjectId};
 use futures::stream::TryStreamExt;
-use mongodb::Database;
+use mongodb::{ClientSession, Database};
 use serde::{Deserialize, Serialize};
+
+use crate::db_util;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum SecurityType {
@@ -20,17 +22,8 @@ pub struct Security {
 impl Security {
     pub const COLLECTION_NAME: &'static str = "securities";
 
-    pub async fn insert(&self, db: &Database) -> Result<()> {
-        let result = db
-            .collection::<Self>(Self::COLLECTION_NAME)
-            .insert_one(self)
-            .await?;
-        tracing::info!(
-            "inserted security {:?}: (reported insert id: {:?})",
-            self,
-            result.inserted_id
-        );
-        Ok(())
+    pub async fn insert(&self, db: &Database, session: Option<&mut ClientSession>) -> Result<()> {
+        db_util::insert(self, db, Self::COLLECTION_NAME, session).await
     }
 
     pub async fn find_by_id(db: &Database, id: ObjectId) -> Result<Option<Self>> {

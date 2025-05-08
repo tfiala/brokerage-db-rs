@@ -1,7 +1,7 @@
-use crate::{account::BrokerageAccount, security::Security};
+use crate::{account::BrokerageAccount, db_util, security::Security};
 use anyhow::Result;
 use bson::oid::ObjectId;
-use mongodb::Database;
+use mongodb::{ClientSession, Database};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -25,17 +25,8 @@ pub struct TradeExecution {
 impl TradeExecution {
     pub const COLLECTION_NAME: &'static str = "trade_executions";
 
-    pub async fn insert(&self, db: &Database) -> Result<()> {
-        let result = db
-            .collection::<Self>(Self::COLLECTION_NAME)
-            .insert_one(self)
-            .await?;
-        tracing::info!(
-            "inserted trade execution {:?}: (reported insert id: {:?})",
-            self,
-            result.inserted_id
-        );
-        Ok(())
+    pub async fn insert(&self, db: &Database, session: Option<&mut ClientSession>) -> Result<()> {
+        db_util::insert(self, db, Self::COLLECTION_NAME, session).await
     }
 
     pub async fn find_by_id(db: &Database, id: ObjectId) -> Result<Option<Self>> {
