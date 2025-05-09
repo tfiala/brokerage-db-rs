@@ -1,8 +1,11 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use bson::{doc, oid::ObjectId};
 use futures::stream::TryStreamExt;
 use mongodb::{ClientSession, Database};
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 
 use crate::db_util;
 
@@ -57,7 +60,11 @@ impl Security {
         self.ibkr_conid
     }
 
-    pub async fn insert(&self, db: &Database, session: Option<&mut ClientSession>) -> Result<()> {
+    pub async fn insert(
+        &self,
+        db: &Database,
+        session: Option<Arc<Mutex<ClientSession>>>,
+    ) -> Result<()> {
         db_util::insert(self, db, Self::COLLECTION_NAME, session).await
     }
 

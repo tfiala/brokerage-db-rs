@@ -1,33 +1,32 @@
 use anyhow::Result;
-use mongodb::{ClientSession, Database, action::InsertOne};
+use mongodb::{ClientSession, Database};
 use serde::Serialize;
-use std::{any::type_name, fmt::Debug};
-
-fn maybe_add_session<'a>(
-    insert_one: InsertOne<'a>,
-    session: Option<&'a mut ClientSession>,
-) -> InsertOne<'a> {
-    match session {
-        Some(session) => insert_one.session(session),
-        None => insert_one,
-    }
-}
+use std::{any::type_name, fmt::Debug, sync::Arc};
+use tokio::sync::Mutex;
 
 pub async fn insert<T>(
     t: &T,
     db: &Database,
     collection_name: &str,
-    session: Option<&mut ClientSession>,
+    session: Option<Arc<Mutex<ClientSession>>>,
 ) -> Result<()>
 where
     T: Serialize + Send + Sync + Debug,
 {
     let collection = db.collection::<T>(collection_name);
-    let db_op = collection.insert_one(t);
-    let result = maybe_add_session(db_op, session).await?;
+
+    let result = if session.is_some() {
+        let session_am = session.unwrap();
+        collection
+            .insert_one(t)
+            .session(&mut *session_am.lock().await)
+            .await?
+    } else {
+        collection.insert_one(t).await?
+    };
 
     tracing::info!(
-        "inserted {} {:?}: (reported insert id: {:?})",
+        "inserted {} {:?}, _id: {}",
         type_name::<T>(),
         t,
         result.inserted_id

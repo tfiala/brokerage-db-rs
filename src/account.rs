@@ -2,7 +2,8 @@ use anyhow::Result;
 use bson::oid::ObjectId;
 use mongodb::{ClientSession, Database};
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
+use tokio::sync::Mutex;
 
 use crate::db_util;
 
@@ -36,7 +37,12 @@ impl BrokerageAccount {
         &self.account_id
     }
 
-    pub async fn insert(&self, db: &Database, session: Option<&mut ClientSession>) -> Result<()> {
+    pub async fn insert(
+        &self,
+        db: &Database,
+        session: Option<Arc<Mutex<ClientSession>>>,
+    ) -> Result<()> {
+        // Option<&mut ClientSession>
         db_util::insert(self, db, Self::COLLECTION_NAME, session).await
     }
 

@@ -1,8 +1,11 @@
+use std::sync::Arc;
+
 use crate::{account::BrokerageAccount, db_util, security::Security};
 use anyhow::Result;
 use bson::oid::ObjectId;
 use mongodb::{ClientSession, Database};
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum TradeSide {
@@ -65,7 +68,11 @@ impl TradeExecution {
         &self.side
     }
 
-    pub async fn insert(&self, db: &Database, session: Option<&mut ClientSession>) -> Result<()> {
+    pub async fn insert(
+        &self,
+        db: &Database,
+        session: Option<Arc<Mutex<ClientSession>>>,
+    ) -> Result<()> {
         db_util::insert(self, db, Self::COLLECTION_NAME, session).await
     }
 
