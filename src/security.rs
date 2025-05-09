@@ -37,23 +37,23 @@ impl Security {
         }
     }
 
-    pub fn get_id(&self) -> ObjectId {
+    pub fn id(&self) -> ObjectId {
         self._id
     }
 
-    pub fn get_listing_exchange(&self) -> &str {
+    pub fn listing_exchange(&self) -> &str {
         &self.listing_exchange
     }
 
-    pub fn get_security_type(&self) -> &SecurityType {
+    pub fn security_type(&self) -> &SecurityType {
         &self.security_type
     }
 
-    pub fn get_ticker(&self) -> &str {
+    pub fn ticker(&self) -> &str {
         &self.ticker
     }
 
-    pub fn get_ibkr_conid(&self) -> Option<u32> {
+    pub fn ibkr_conid(&self) -> Option<u32> {
         self.ibkr_conid
     }
 

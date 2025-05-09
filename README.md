@@ -10,7 +10,7 @@ Database management for trader brokerage data with a MongoDB backend.
 
 ```toml
 [dependencies]
-brokerage-db = "0.2.3"
+brokerage-db = "0.2.4"
 ```
 
 ## Functionality
@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
 
 * [x] support securities
 * [x] support minimal brokerage account data (account id, brokerage name)
-* [ ] support trade executions
+* [x] support trade executions
 
 ### Data sourced from InteractiveBrokers (IBKR) Flex-based report queries
 

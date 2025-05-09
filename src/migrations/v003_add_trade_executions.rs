@@ -10,6 +10,8 @@ pub struct Migration003 {}
 const TRADE_EXECUTIONS_UNIQUE_INDEX_NAME: &str = "trade_executions_unique_idx";
 const TRADE_EXECUTIONS_BY_ACCOUNT_SECURITY_TIMESTAMP_INDEX_NAME: &str =
     "trade_executions_by_account_security_timestamp_idx";
+const TRADE_EXECUTIONS_BY_ACCOUNT_TIMESTAMP_INDEX_NAME: &str =
+    "trade_executions_by_account_timestamp_idx";
 
 #[async_trait]
 impl tfiala_mongodb_migrator::migration::Migration for Migration003 {
@@ -45,6 +47,16 @@ impl tfiala_mongodb_migrator::migration::Migration for Migration003 {
                         .build(),
                 )
                 .build(),
+            IndexModel::builder()
+                .keys(doc! { "brokerage_account_id": 1, "execution_timestamp": 1 })
+                .options(
+                    IndexOptions::builder()
+                        .name(Some(
+                            TRADE_EXECUTIONS_BY_ACCOUNT_TIMESTAMP_INDEX_NAME.to_owned(),
+                        ))
+                        .build(),
+                )
+                .build(),
         ];
 
         collection.create_indexes(indexes).await?;
@@ -55,6 +67,10 @@ impl tfiala_mongodb_migrator::migration::Migration for Migration003 {
     async fn down(&self, env: Env) -> Result<()> {
         let db = env.db.unwrap();
         let collection = db.collection::<Security>(TradeExecution::COLLECTION_NAME);
+
+        collection
+            .drop_index(TRADE_EXECUTIONS_BY_ACCOUNT_TIMESTAMP_INDEX_NAME)
+            .await?;
 
         collection
             .drop_index(TRADE_EXECUTIONS_BY_ACCOUNT_SECURITY_TIMESTAMP_INDEX_NAME)

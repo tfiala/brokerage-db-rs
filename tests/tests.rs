@@ -3,7 +3,7 @@ use brokerage_db::{
     account::BrokerageAccount,
     initialize, remove_data,
     security::{Security, SecurityType},
-    trade_execution::{TradeExecution, TradeSide},
+    trade_execution::{self, TradeExecution, TradeSide},
 };
 use mongodb::{
     Client, Database,
@@ -77,17 +77,17 @@ fn security_with_conid() -> Security {
 fn trade_execution_desc() -> TradeExecutionDesc {
     let security = Security::new(SecurityType::Stock, "AAPL", "NASDAQ", None);
     let brokerage_account = BrokerageAccount::new("batch-brokers", "A1234567");
-    let trade_execution = TradeExecution {
-        _id: bson::oid::ObjectId::new(),
-        brokerage_account_id: brokerage_account.get_id(),
-        brokerage_execution_id: "abc-123-def".to_owned(),
-        commission: 0.0,
-        execution_timestamp_ms: 1746665451000,
-        quantity: 100,
-        price: 150.0,
-        security_id: security.get_id(),
-        side: TradeSide::Buy,
-    };
+    let trade_execution = TradeExecution::builder()
+        .brokerage_account_id(brokerage_account.id())
+        .brokerage_execution_id("abc-123-def")
+        .commission(0.0)
+        .execution_timestamp_ms(1746665451000)
+        .quantity(100)
+        .price(150.0)
+        .security_id(security.id())
+        .side(TradeSide::Buy)
+        .build()
+        .expect("Failed to build TradeExecution");
 
     TradeExecutionDesc {
         security,
@@ -150,8 +150,8 @@ async fn insert_brokerage_account_works(
         .db
         .collection::<BrokerageAccount>(BrokerageAccount::COLLECTION_NAME)
         .find_one(bson::doc! {
-        "brokerage_id": brokerage_account.get_brokerage_id(),
-        "account_id": brokerage_account.get_account_id() })
+        "brokerage_id": brokerage_account.brokerage_id(),
+        "account_id": brokerage_account.account_id() })
         .await?
         .ok_or_else(|| anyhow::anyhow!("Brokerage account not found"))?;
 
@@ -203,8 +203,8 @@ async fn insert_security_works(
 
     let found_security = Security::find_by_ticker_and_exchange(
         &dbc.db,
-        security.get_ticker(),
-        security.get_listing_exchange(),
+        security.ticker(),
+        security.listing_exchange(),
     )
     .await?;
 
@@ -229,8 +229,8 @@ async fn insert_security_with_conid_works(
         .db
         .collection::<Security>(Security::COLLECTION_NAME)
         .find_one(bson::doc! {
-        "ticker": security_with_conid.get_ticker(),
-        "listing_exchange": security_with_conid.get_listing_exchange() })
+        "ticker": security_with_conid.ticker(),
+        "listing_exchange": security_with_conid.listing_exchange() })
         .await?
         .ok_or_else(|| anyhow::anyhow!("Security not found"))?;
 
@@ -250,8 +250,8 @@ async fn find_non_extant_security_fails(
     let dbc = test_db_conn?;
     let result = Security::find_by_ticker_and_exchange(
         &dbc.db,
-        security.get_ticker(),
-        security.get_listing_exchange(),
+        security.ticker(),
+        security.listing_exchange(),
     )
     .await;
 
@@ -274,8 +274,8 @@ async fn find_security_with_ticker_and_exchange_works(
 
     let result = Security::find_by_ticker_and_exchange(
         &dbc.db,
-        security.get_ticker(),
-        security.get_listing_exchange(),
+        security.ticker(),
+        security.listing_exchange(),
     )
     .await;
     assert!(result.is_ok());
@@ -298,7 +298,7 @@ async fn find_security_with_ticker_and_one_match_works(
     let dbc = test_db_conn?;
     security.insert(&dbc.db, None).await?;
 
-    let result = Security::find_by_ticker(&dbc.db, security.get_ticker()).await;
+    let result = Security::find_by_ticker(&dbc.db, security.ticker()).await;
     assert!(result.is_ok());
 
     let found_securities = result.unwrap();
@@ -318,7 +318,7 @@ async fn find_non_extant_security_with_ticker_returns_zero_elements(
 ) -> Result<()> {
     let dbc = test_db_conn?;
 
-    let result = Security::find_by_ticker(&dbc.db, security.get_ticker()).await;
+    let result = Security::find_by_ticker(&dbc.db, security.ticker()).await;
     assert!(result.is_ok());
 
     let found_securities = result.unwrap();
@@ -338,10 +338,10 @@ async fn find_security_with_ticker_and_two_match_works(
     let dbc = test_db_conn?;
     security.insert(&dbc.db, None).await?;
 
-    let security2 = Security::new(SecurityType::Stock, security.get_ticker(), "NYSE", None);
+    let security2 = Security::new(SecurityType::Stock, security.ticker(), "NYSE", None);
     security2.insert(&dbc.db, None).await?;
 
-    let result = Security::find_by_ticker(&dbc.db, security.get_ticker()).await;
+    let result = Security::find_by_ticker(&dbc.db, security.ticker()).await;
     assert!(result.is_ok());
 
     let found_securities = result.unwrap();
@@ -363,8 +363,7 @@ async fn find_security_by_conid_works(
     let dbc = test_db_conn?;
     security_with_conid.insert(&dbc.db, None).await?;
 
-    let result =
-        Security::find_by_conid(&dbc.db, security_with_conid.get_ibkr_conid().unwrap()).await;
+    let result = Security::find_by_conid(&dbc.db, security_with_conid.ibkr_conid().unwrap()).await;
     assert!(result.is_ok());
 
     let found_security = result.unwrap();
@@ -384,8 +383,7 @@ async fn find_non_extant_security_by_conid_fails(
 ) -> Result<()> {
     let dbc = test_db_conn?;
 
-    let result =
-        Security::find_by_conid(&dbc.db, security_with_conid.get_ibkr_conid().unwrap()).await;
+    let result = Security::find_by_conid(&dbc.db, security_with_conid.ibkr_conid().unwrap()).await;
     assert!(result.is_ok());
 
     let found_security = result.unwrap();
@@ -418,7 +416,7 @@ async fn insert_trade_execution_works(
         .await?;
 
     let found_trade_execution =
-        TradeExecution::find_by_id(&dbc.db, trade_execution_desc.trade_execution._id).await?;
+        TradeExecution::find_by_id(&dbc.db, trade_execution_desc.trade_execution.id()).await?;
     assert!(found_trade_execution.is_some());
     assert_eq!(
         trade_execution_desc.trade_execution,
@@ -428,7 +426,7 @@ async fn insert_trade_execution_works(
     // Check that the trade execution is linked to the correct brokerage account and security.
     let found_brokerage_account = BrokerageAccount::find_by_id(
         &dbc.db,
-        trade_execution_desc.trade_execution.brokerage_account_id,
+        trade_execution_desc.trade_execution.brokerage_account_id(),
     )
     .await?;
     assert!(found_brokerage_account.is_some());
@@ -437,9 +435,57 @@ async fn insert_trade_execution_works(
         found_brokerage_account.unwrap()
     );
     let found_security =
-        Security::find_by_id(&dbc.db, trade_execution_desc.trade_execution.security_id).await?;
+        Security::find_by_id(&dbc.db, trade_execution_desc.trade_execution.security_id()).await?;
     assert!(found_security.is_some());
     assert_eq!(trade_execution_desc.security, found_security.unwrap());
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[traced_test]
+#[tokio::test]
+async fn insert_two_trade_executions_works(
+    #[future] test_db_conn: Result<DbConnection>,
+    trade_execution_desc: TradeExecutionDesc,
+) -> Result<()> {
+    let dbc = test_db_conn?;
+
+    // Insert the brokerage account and security first.
+    trade_execution_desc
+        .brokerage_account
+        .insert(&dbc.db, None)
+        .await?;
+    trade_execution_desc.security.insert(&dbc.db, None).await?;
+
+    // Now insert the trade execution.
+    trade_execution_desc
+        .trade_execution
+        .insert(&dbc.db, None)
+        .await?;
+
+    // Insert a similar trade execution.
+    let trade_execution_2 =
+        trade_execution::Builder::from_trade_execution(&trade_execution_desc.trade_execution)
+            .brokerage_execution_id("abc-123-def-2")
+            .execution_timestamp_ms(1746665452000)
+            .build()?;
+
+    trade_execution_2.insert(&dbc.db, None).await?;
+
+    let found_trade_execution =
+        TradeExecution::find_by_id(&dbc.db, trade_execution_desc.trade_execution.id()).await?;
+    assert!(found_trade_execution.is_some());
+    assert_eq!(
+        trade_execution_desc.trade_execution,
+        found_trade_execution.unwrap()
+    );
+
+    let found_trade_execution_2 =
+        TradeExecution::find_by_id(&dbc.db, trade_execution_2.id()).await?;
+    assert!(found_trade_execution_2.is_some());
+    assert_eq!(trade_execution_2, found_trade_execution_2.unwrap());
 
     Ok(())
 }

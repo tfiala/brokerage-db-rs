@@ -24,15 +24,15 @@ impl BrokerageAccount {
         }
     }
 
-    pub fn get_id(&self) -> ObjectId {
+    pub fn id(&self) -> ObjectId {
         self._id
     }
 
-    pub fn get_brokerage_id(&self) -> &str {
+    pub fn brokerage_id(&self) -> &str {
         &self.brokerage_id
     }
 
-    pub fn get_account_id(&self) -> &str {
+    pub fn account_id(&self) -> &str {
         &self.account_id
     }
 
