@@ -17,9 +17,9 @@ pub struct TradeExecution {
     _id: bson::oid::ObjectId,
     brokerage_account_id: bson::oid::ObjectId,
     brokerage_execution_id: String,
-    execution_timestamp_ms: i64,
     commission: f64,
-    quantity: u64,
+    execution_timestamp_ms: i64,
+    quantity: f64,
     price: f64,
     security_id: bson::oid::ObjectId,
     side: TradeSide,
@@ -52,7 +52,7 @@ impl TradeExecution {
         self.commission
     }
 
-    pub fn quantity(&self) -> u64 {
+    pub fn quantity(&self) -> f64 {
         self.quantity
     }
 
@@ -114,7 +114,7 @@ pub struct Builder {
     brokerage_execution_id: Option<String>,
     execution_timestamp_ms: Option<i64>,
     commission: Option<f64>,
-    quantity: Option<u64>,
+    quantity: Option<f64>,
     price: Option<f64>,
     security_id: Option<bson::oid::ObjectId>,
     side: Option<TradeSide>,
@@ -166,7 +166,7 @@ impl Builder {
         self
     }
 
-    pub fn quantity(mut self, quantity: u64) -> Self {
+    pub fn quantity(mut self, quantity: f64) -> Self {
         self.quantity = Some(quantity);
         self
     }

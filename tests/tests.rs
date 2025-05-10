@@ -82,7 +82,7 @@ fn trade_execution_desc() -> TradeExecutionDesc {
         .brokerage_execution_id("abc-123-def")
         .commission(0.0)
         .execution_timestamp_ms(1746665451000)
-        .quantity(100)
+        .quantity(100.0)
         .price(150.0)
         .security_id(security.id())
         .side(TradeSide::Buy)
