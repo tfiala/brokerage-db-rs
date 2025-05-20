@@ -1,5 +1,6 @@
 // Public modules.
 pub mod account;
+pub mod eod_summary;
 pub mod security;
 pub mod trade_execution;
 

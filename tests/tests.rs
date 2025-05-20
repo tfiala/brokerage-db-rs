@@ -64,6 +64,11 @@ fn brokerage_account() -> BrokerageAccount {
 }
 
 #[fixture]
+fn brokerage_account_2() -> BrokerageAccount {
+    BrokerageAccount::new("another-broker", "G12-789-XYZ")
+}
+
+#[fixture]
 fn security() -> Security {
     Security::new(SecurityType::Stock, "AAPL", "NASDAQ", None)
 }
@@ -156,6 +161,27 @@ async fn insert_brokerage_account_works(
         .ok_or_else(|| anyhow::anyhow!("Brokerage account not found"))?;
 
     assert_eq!(brokerage_account, found_account);
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[traced_test]
+#[tokio::test]
+async fn find_all_brokerage_accounts_works(
+    #[future] test_db_conn: Result<DbConnection>,
+    brokerage_account: BrokerageAccount,
+    brokerage_account_2: BrokerageAccount,
+) -> Result<()> {
+    let dbc = test_db_conn?;
+    brokerage_account.insert(&dbc.db, None).await?;
+    brokerage_account_2.insert(&dbc.db, None).await?;
+
+    let found_accounts = BrokerageAccount::find(&dbc.db).await?;
+
+    assert!(found_accounts.contains(&brokerage_account));
+    assert!(found_accounts.contains(&brokerage_account_2));
 
     Ok(())
 }

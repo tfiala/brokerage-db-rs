@@ -1,5 +1,6 @@
 use anyhow::Result;
 use bson::oid::ObjectId;
+use futures::TryStreamExt;
 use mongodb::{ClientSession, Database};
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, sync::Arc};
@@ -44,6 +45,15 @@ impl BrokerageAccount {
     ) -> Result<()> {
         // Option<&mut ClientSession>
         db_util::insert(self, db, Self::COLLECTION_NAME, session).await
+    }
+
+    pub async fn find(db: &Database) -> Result<Vec<Self>> {
+        Ok(db
+            .collection::<Self>(Self::COLLECTION_NAME)
+            .find(bson::doc! {})
+            .await?
+            .try_collect()
+            .await?)
     }
 
     pub async fn find_by_brokerage_and_account_id(

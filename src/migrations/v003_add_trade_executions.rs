@@ -1,4 +1,4 @@
-use crate::{security::Security, trade_execution::TradeExecution};
+use crate::trade_execution::TradeExecution;
 use anyhow::Result;
 use async_trait::async_trait;
 use bson::doc;
@@ -66,7 +66,7 @@ impl tfiala_mongodb_migrator::migration::Migration for Migration003 {
 
     async fn down(&self, env: Env) -> Result<()> {
         let db = env.db.unwrap();
-        let collection = db.collection::<Security>(TradeExecution::COLLECTION_NAME);
+        let collection = db.collection::<TradeExecution>(TradeExecution::COLLECTION_NAME);
 
         collection
             .drop_index(TRADE_EXECUTIONS_BY_ACCOUNT_TIMESTAMP_INDEX_NAME)
