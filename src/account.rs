@@ -4,64 +4,18 @@ use bson::oid::ObjectId;
 use futures::TryStreamExt;
 use mongodb::{ClientSession, Database};
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, sync::Arc};
+use std::{any::Any, fmt::Debug, sync::Arc};
 use tokio::sync::Mutex;
 
 use crate::db_util;
 
 #[async_trait]
-pub trait DbConnection<I> {
-    //
-    // Brokerage Accounts
-    //
-    fn new_brokerage_account(
-        &self,
-        account_id: String,
-        brokerage_id: String,
-    ) -> Box<dyn IBrokerageAccount<I>>;
-
-    async fn find_bacct_all(&self) -> Result<Vec<Box<dyn IBrokerageAccount<I>>>>;
-    async fn find_bacct_by_brokerage_and_account_id(
-        &self,
-        brokerage_id: &str,
-        account_id: &str,
-    ) -> Result<Option<Box<dyn IBrokerageAccount<I>>>>;
-    async fn find_bacct_by_dbid(&self, dbid: &I) -> Result<Option<Box<dyn IBrokerageAccount<I>>>>;
-}
-
-#[async_trait]
 pub trait IBrokerageAccount<I> {
-    fn dbid(&self) -> I;
+    fn as_any(&self) -> &dyn Any;
+    fn dbid(&self) -> &I;
 
-    fn account_id(&self) -> String;
-    fn brokerage_id(&self) -> String;
-
-    // fn insert(&self, dbconn: Box<dyn DbConnection<I>>) -> Result<()>;
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct BrokerageAccountMdb {
-    _id: ObjectId,
-    brokerage_id: String,
-    account_id: String,
-}
-
-impl IBrokerageAccount<ObjectId> for BrokerageAccountMdb {
-    fn dbid(&self) -> ObjectId {
-        self._id
-    }
-
-    fn account_id(&self) -> String {
-        self.account_id.clone()
-    }
-
-    fn brokerage_id(&self) -> String {
-        self.brokerage_id.clone()
-    }
-
-    // fn insert(&self, dbconn: Box<dyn DbConnection<ObjectId>>) -> Result<()> {
-    //     db_util::insert(self, db, Self::COLLECTION_NAME, session).await
-    // }
+    fn account_id(&self) -> &str;
+    fn brokerage_id(&self) -> &str;
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]

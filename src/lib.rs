@@ -1,6 +1,9 @@
 // Public modules.
 pub mod account;
+pub mod db_connection;
+pub mod dynamo;
 pub mod eod_summary;
+pub mod mongo;
 pub mod security;
 pub mod trade_execution;
 
