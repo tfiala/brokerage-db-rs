@@ -11,6 +11,18 @@ pub struct DynamoDbConnection {}
 #[async_trait]
 impl DbConnection<String> for DynamoDbConnection {
     //
+    // Migrations
+    //
+
+    async fn run_migrations(&self) -> Result<()> {
+        todo!()
+    }
+
+    async fn remove_migrations(&self) -> Result<()> {
+        todo!()
+    }
+
+    //
     // Brokerage Accounts
     //
     fn new_brokerage_account(

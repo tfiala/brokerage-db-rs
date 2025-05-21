@@ -16,6 +16,18 @@ pub struct MdbDbConnection {
 #[async_trait]
 impl DbConnection<ObjectId> for MdbDbConnection {
     //
+    // migrations
+    //
+
+    async fn run_migrations(&self) -> Result<()> {
+        migrations::run_migrations(&self.db).await
+    }
+
+    async fn remove_migrations(&self) -> Result<()> {
+        migrations::run_down_migrations(&self.db).await
+    }
+
+    //
     // Brokerage Accounts
     //
     fn new_brokerage_account(

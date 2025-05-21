@@ -6,6 +6,13 @@ use crate::account::IBrokerageAccount;
 #[async_trait]
 pub trait DbConnection<I> {
     //
+    // Migrations
+    //
+
+    async fn run_migrations(&self) -> Result<()>;
+    async fn remove_migrations(&self) -> Result<()>;
+
+    //
     // Brokerage Accounts
     //
     fn new_brokerage_account(
