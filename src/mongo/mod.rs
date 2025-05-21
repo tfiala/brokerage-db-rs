@@ -1,15 +1,50 @@
 mod account;
 pub mod migrations;
 
-use crate::{account::IBrokerageAccount, db_connection::DbConnection, db_util};
+use crate::{
+    account::IBrokerageAccount, db_connection::DbConnection,
+    db_connection_factory::DbConnectionFactory, db_util,
+};
 use account::MdbBrokerageAccount;
 use anyhow::Result;
 use async_trait::async_trait;
 use bson::oid::ObjectId;
 use futures::TryStreamExt;
-use mongodb::Database;
+use mongodb::{Client, Database};
+
+pub struct MdbDbConnectionFactory {
+    uri: String,
+    db_name: String,
+}
+
+impl MdbDbConnectionFactory {
+    pub fn new(uri: &str, db_name: &str) -> Self {
+        MdbDbConnectionFactory {
+            db_name: db_name.to_owned(),
+            uri: uri.to_owned(),
+        }
+    }
+}
+
+#[async_trait]
+impl DbConnectionFactory<ObjectId> for MdbDbConnectionFactory {
+    fn id(&self) -> &'static str {
+        "mongodb"
+    }
+
+    async fn create(&self) -> Result<Box<dyn DbConnection<ObjectId>>> {
+        let client = mongodb::Client::with_uri_str(self.uri.clone()).await?;
+        let db = client.database(&self.db_name);
+
+        Ok(Box::new(MdbDbConnection {
+            _client: client,
+            db,
+        }))
+    }
+}
 
 pub struct MdbDbConnection {
+    _client: Client,
     db: Database,
 }
 

@@ -1,6 +1,7 @@
 // Public modules.
 pub mod account;
 pub mod db_connection;
+pub mod db_connection_factory;
 pub mod dynamo;
 pub mod eod_summary;
 pub mod mongo;
