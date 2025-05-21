@@ -9,15 +9,16 @@ pub mod trade_execution;
 
 // Internal modules.
 mod db_util;
-mod migrations;
 
 use anyhow::Result;
 use mongodb::Database;
 
 pub async fn initialize(db: &Database) -> Result<()> {
-    migrations::run_migrations(db).await
+    // TODO fix me: register the database connection and use it to run migrations.
+    mongo::migrations::run_migrations(db).await
 }
 
 pub async fn remove_data(db: &Database) -> Result<()> {
-    migrations::run_down_migrations(db).await
+    // TODO fix me: register the database connection and use it to run migrations.
+    mongo::migrations::run_down_migrations(db).await
 }

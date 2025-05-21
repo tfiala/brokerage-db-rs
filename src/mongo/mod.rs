@@ -1,4 +1,5 @@
 mod account;
+pub mod migrations;
 
 use crate::{account::IBrokerageAccount, db_connection::DbConnection, db_util};
 use account::MdbBrokerageAccount;
