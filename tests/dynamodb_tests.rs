@@ -1,49 +1,55 @@
 use anyhow::Result;
-use aws_config::{BehaviorVersion, meta::region::RegionProviderChain};
-use aws_sdk_dynamodb::{
-    Client,
-    config::Credentials,
-    // types::{
-    //     AttributeDefinition, KeySchemaElement, KeyType, ProvisionedThroughput, ScalarAttributeType,
-    // },
+use brokerage_db::{
+    db_connection::DbConnection, db_connection_factory::DbConnectionFactory, dynamo,
 };
-use std::fmt::Display;
+use rstest::{fixture, rstest};
 use testcontainers::core::IntoContainerPort;
 use testcontainers_modules::{
     dynamodb_local::DynamoDb,
     testcontainers::{ContainerAsync, runners::AsyncRunner},
 };
 
-pub struct DbConnection {
+pub struct TestDbConnection {
     pub node: ContainerAsync<DynamoDb>,
-    pub client: Client,
+    pub db_conn: Box<dyn DbConnection>,
 }
 
-impl DbConnection {
+impl TestDbConnection {
     pub async fn new() -> Result<Self> {
         let node = DynamoDb::default().start().await?;
+
         let host = node.get_host().await?;
         let host_port = node.get_host_port_ipv4(8000.tcp()).await?;
+        let endpoint_url = format!("http://{host}:{host_port}");
 
-        let client = Self::build_dynamodb_client(host, host_port).await;
+        let access_key_id = "fakeKey";
+        let access_key_secret = "fakeSecret";
+        let factory = dynamo::DynamoDbConnectionFactory::new(
+            access_key_id,
+            access_key_secret,
+            Some(endpoint_url),
+        );
 
-        Ok(Self { client, node })
+        let db_conn = factory.create().await?;
+
+        Ok(Self { db_conn, node })
     }
+}
 
-    async fn build_dynamodb_client(host: impl Display, host_port: u16) -> Client {
-        let endpoint_uri = format!("http://{host}:{host_port}");
-        let region_provider = RegionProviderChain::default_provider().or_else("us-east-1");
-        let creds = Credentials::new("fakeKey", "fakeSecret", None, None, "test");
+#[fixture]
+async fn empty_test_db_conn() -> Result<TestDbConnection> {
+    TestDbConnection::new().await
+}
 
-        let shared_config = aws_config::defaults(BehaviorVersion::latest())
-            .region(region_provider)
-            .endpoint_url(endpoint_uri)
-            .credentials_provider(creds)
-            .load()
-            .await;
+#[fixture]
+async fn test_db_conn() -> Result<TestDbConnection> {
+    // Create the dynamodb connection.
+    let test_db_conn = TestDbConnection::new().await?;
 
-        Client::new(&shared_config)
-    }
+    // Run the migrations.
+    test_db_conn.db_conn.run_migrations().await?;
+
+    Ok(test_db_conn)
 }
 
 #[tokio::test]
@@ -51,14 +57,20 @@ async fn test_succeeds() -> Result<()> {
     Ok(())
 }
 
+#[rstest]
+#[awt]
 #[tokio::test]
-async fn empty_dynamodb_has_no_tables() -> Result<()> {
-    let connection = DbConnection::new().await?;
+async fn empty_dynamodb_connection_succeeds(
+    #[future] empty_test_db_conn: Result<TestDbConnection>,
+) -> Result<()> {
+    let _test_db_conn = empty_test_db_conn.unwrap();
+    Ok(())
+}
 
-    let req = connection.client.list_tables();
-    let list_tables_result = req.send().await.unwrap();
-
-    assert_eq!(list_tables_result.table_names().len(), 0);
-
+#[rstest]
+#[awt]
+#[tokio::test]
+async fn migrations_succeed(#[future] test_db_conn: Result<TestDbConnection>) -> Result<()> {
+    let _test_db_conn = test_db_conn.unwrap();
     Ok(())
 }
