@@ -1,14 +1,28 @@
 use anyhow::Result;
 use async_trait::async_trait;
+use aws_sdk_dynamodb::Client;
 
 use crate::{account::IBrokerageAccount, db_connection::DbConnection};
 use account::DynamoDbBrokerageAccount;
 
 mod account;
+mod migrations;
 
 #[derive(Debug)]
 
-pub struct DynamoDbConnection {}
+pub struct DynamoDbConnectionFactory {
+    client: Client,
+}
+
+impl DynamoDbConnectionFactory {
+    pub fn new(client: Client) -> Self {
+        DynamoDbConnectionFactory { client }
+    }
+}
+
+pub struct DynamoDbConnection {
+    client: Client,
+}
 
 #[async_trait]
 impl DbConnection for DynamoDbConnection {
@@ -17,11 +31,11 @@ impl DbConnection for DynamoDbConnection {
     //
 
     async fn run_migrations(&self) -> Result<()> {
-        todo!()
+        migrations::run_migrations(&self.client).await
     }
 
     async fn remove_migrations(&self) -> Result<()> {
-        todo!()
+        migrations::remove_migrations(&self.client).await
     }
 
     //

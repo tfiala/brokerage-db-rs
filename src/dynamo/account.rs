@@ -4,13 +4,13 @@ use crate::account::IBrokerageAccount;
 use std::any::Any;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct DynamoDbBrokerageAccount {
+pub struct DynamoBrokerageAccount {
     pub dbid: String,
     pub account_id: String,
     pub brokerage_id: String,
 }
 
-impl IBrokerageAccount for DynamoDbBrokerageAccount {
+impl IBrokerageAccount for DynamoBrokerageAccount {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -24,7 +24,12 @@ impl IBrokerageAccount for DynamoDbBrokerageAccount {
     }
 }
 
-impl DynamoDbBrokerageAccount {
+impl DynamoBrokerageAccount {
+    pub const TABLE_NAME: &str = "brokerage_accounts";
+
+    pub const ACCOUNT_ID_COL_NAME: &str = "account_id";
+    pub const BROKERAGE_ID_COL_NAME: &str = "brokerage_id";
+
     pub fn new(brokerage_id: &str, account_id: &str) -> Self {
         Self {
             dbid: format!("{}#{}", brokerage_id, account_id),
