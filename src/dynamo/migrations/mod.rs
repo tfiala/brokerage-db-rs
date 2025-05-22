@@ -8,7 +8,7 @@ use runner::Runner;
 use v001_add_brokerage_account::*;
 
 #[async_trait]
-pub trait Migration: Send {
+pub trait Migration: Send + Sync {
     fn id(&self) -> &'static str;
     async fn up(&self, client: &Client) -> Result<()>;
     async fn down(&self, client: &Client) -> Result<()>;

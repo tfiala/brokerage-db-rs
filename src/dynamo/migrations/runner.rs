@@ -16,7 +16,7 @@ impl Runner {
             let result = migration.up(client).await;
             if result.is_err() {
                 tracing::warn!(
-                    "migration {} failed, stopping further migrations",
+                    "migration up {} failed, stopping further migrations",
                     migration.id()
                 )
             }
@@ -24,7 +24,16 @@ impl Runner {
         Ok(())
     }
 
-    pub async fn down(&self, _client: &Client) -> Result<()> {
+    pub async fn down(&self, client: &Client) -> Result<()> {
+        for migration in self.migrations.iter().rev() {
+            let result = migration.down(client).await;
+            if result.is_err() {
+                tracing::warn!(
+                    "migration down {} failed, stopping further migrations",
+                    migration.id()
+                )
+            }
+        }
         Ok(())
     }
 }

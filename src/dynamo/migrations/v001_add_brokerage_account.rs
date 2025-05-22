@@ -1,7 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use aws_sdk_dynamodb::{
-    Client, Error,
+    Client,
     types::{AttributeDefinition, BillingMode, KeySchemaElement, KeyType, ScalarAttributeType},
 };
 

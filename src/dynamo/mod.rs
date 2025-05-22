@@ -1,22 +1,64 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use aws_sdk_dynamodb::Client;
+use aws_config::{BehaviorVersion, SdkConfig, meta::region::RegionProviderChain};
+use aws_sdk_dynamodb::{Client, config::Credentials};
 
-use crate::{account::IBrokerageAccount, db_connection::DbConnection};
+use crate::{
+    account::IBrokerageAccount, db_connection::DbConnection,
+    db_connection_factory::DbConnectionFactory,
+};
 use account::DynamoBrokerageAccount;
 
 mod account;
 mod migrations;
 
-#[derive(Debug)]
-
 pub struct DynamoDbConnectionFactory {
-    client: Client,
+    endpoint_url: Option<String>,
+    access_key_id: String,
+    access_key_secret: String,
 }
 
 impl DynamoDbConnectionFactory {
-    pub fn new(client: Client) -> Self {
-        DynamoDbConnectionFactory { client }
+    pub fn new(access_key_id: &str, access_key_secret: &str, endpoint_url: Option<String>) -> Self {
+        DynamoDbConnectionFactory {
+            access_key_id: access_key_id.to_owned(),
+            access_key_secret: access_key_secret.to_owned(),
+            endpoint_url,
+        }
+    }
+
+    async fn sdk_config(&self) -> SdkConfig {
+        let region_provider = RegionProviderChain::default_provider().or_else("us-east-1");
+        let creds = Credentials::new(
+            &self.access_key_id,
+            &self.access_key_secret,
+            None,
+            None,
+            "test",
+        );
+
+        let mut config_loader = aws_config::defaults(BehaviorVersion::latest())
+            .region(region_provider)
+            .credentials_provider(creds);
+
+        if let Some(endpoint_url) = &self.endpoint_url {
+            config_loader = config_loader.endpoint_url(endpoint_url);
+        }
+
+        config_loader.load().await
+    }
+}
+
+#[async_trait]
+impl DbConnectionFactory for DynamoDbConnectionFactory {
+    fn id(&self) -> &'static str {
+        "dynamodb"
+    }
+
+    async fn create(&self) -> Result<Box<dyn DbConnection>> {
+        let sdk_config = self.sdk_config().await;
+        let client = Client::new(&sdk_config);
+        Ok(Box::new(DynamoDbConnection { client }))
     }
 }
 
