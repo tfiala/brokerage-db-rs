@@ -19,7 +19,7 @@ pub trait DbConnection<I> {
         &self,
         account_id: &str,
         brokerage_id: &str,
-    ) -> Box<dyn IBrokerageAccount<I>>;
+    ) -> Box<dyn IBrokerageAccount<I> + Send>;
     async fn insert_bacct(&self, bacct: Box<dyn IBrokerageAccount<I> + Send>) -> Result<()>;
     async fn update_bacct(&self, bacct: Box<dyn IBrokerageAccount<I> + Send>) -> Result<()>;
 

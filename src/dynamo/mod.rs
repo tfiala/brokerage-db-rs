@@ -6,6 +6,8 @@ use account::DynamoDbBrokerageAccount;
 
 mod account;
 
+#[derive(Debug)]
+
 pub struct DynamoDbConnection {}
 
 #[async_trait]
@@ -29,7 +31,7 @@ impl DbConnection<String> for DynamoDbConnection {
         &self,
         account_id: &str,
         brokerage_id: &str,
-    ) -> Box<dyn IBrokerageAccount<String>> {
+    ) -> Box<dyn IBrokerageAccount<String> + Send> {
         Box::new(DynamoDbBrokerageAccount::new(brokerage_id, account_id))
     }
 

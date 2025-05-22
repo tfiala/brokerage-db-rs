@@ -43,6 +43,7 @@ impl DbConnectionFactory<ObjectId> for MdbDbConnectionFactory {
     }
 }
 
+#[derive(Debug)]
 pub struct MdbDbConnection {
     _client: Client,
     db: Database,
@@ -69,7 +70,7 @@ impl DbConnection<ObjectId> for MdbDbConnection {
         &self,
         account_id: &str,
         brokerage_id: &str,
-    ) -> Box<dyn IBrokerageAccount<ObjectId>> {
+    ) -> Box<dyn IBrokerageAccount<ObjectId> + Send> {
         Box::new(MdbBrokerageAccount {
             _id: ObjectId::new(),
             account_id: account_id.to_owned(),

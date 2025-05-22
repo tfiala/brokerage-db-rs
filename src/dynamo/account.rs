@@ -1,6 +1,9 @@
+use serde::{Deserialize, Serialize};
+
 use crate::account::IBrokerageAccount;
 use std::any::Any;
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct DynamoDbBrokerageAccount {
     pub dbid: String,
     pub account_id: String,
