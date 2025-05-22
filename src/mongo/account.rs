@@ -15,13 +15,9 @@ impl MdbBrokerageAccount {
     pub const COLLECTION_NAME: &'static str = "brokerage_accounts";
 }
 
-impl IBrokerageAccount<ObjectId> for MdbBrokerageAccount {
+impl IBrokerageAccount for MdbBrokerageAccount {
     fn as_any(&self) -> &dyn Any {
         self
-    }
-
-    fn dbid(&self) -> &ObjectId {
-        &self._id
     }
 
     fn account_id(&self) -> &str {

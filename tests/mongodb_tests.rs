@@ -7,7 +7,6 @@ use brokerage_db::{
     security::{Security, SecurityType},
     trade_execution::{self, TradeExecution, TradeSide},
 };
-use bson::oid::ObjectId;
 use mongodb::{
     Client, Database,
     error::{Error, ErrorKind, WriteFailure},
@@ -20,7 +19,7 @@ use testcontainers_modules::{
 // use tracing_test::traced_test;
 
 struct TestDbConnection {
-    db_conn: Box<dyn DbConnection<ObjectId>>,
+    db_conn: Box<dyn DbConnection>,
     _node: ContainerAsync<Mongo>,
 }
 
@@ -101,17 +100,13 @@ const BROKERAGE_ACCOUNT_ID: &str = "A1234567";
 const BROKERAGE_ID_2: &str = "another-broker";
 const BROKERAGE_ACCOUNT_ID_2: &str = "DA7654321";
 
-fn brokerage_account(
-    db_conn: Box<dyn DbConnection<ObjectId>>,
-) -> Box<dyn IBrokerageAccount<ObjectId> + Send> {
+fn brokerage_account(db_conn: &Box<dyn DbConnection>) -> Box<dyn IBrokerageAccount> {
     db_conn.new_brokerage_account(BROKERAGE_ACCOUNT_ID, BROKERAGE_ID)
 }
 
-fn brokerage_account_2(
-    db_conn: Box<dyn DbConnection<ObjectId>>,
-) -> Box<dyn IBrokerageAccount<ObjectId> + Send> {
-    db_conn.new_brokerage_account(BROKERAGE_ACCOUNT_ID_2, BROKERAGE_ID_2)
-}
+// fn brokerage_account_2(db_conn: &Box<dyn DbConnection>) -> Box<dyn IBrokerageAccount> {
+//     db_conn.new_brokerage_account(BROKERAGE_ACCOUNT_ID_2, BROKERAGE_ID_2)
+// }
 
 #[fixture]
 fn brokerage_account_old() -> BrokerageAccount {
@@ -221,16 +216,24 @@ async fn insert_brokerage_account_works(
     #[future] test_db_conn: Result<TestDbConnection>,
 ) -> Result<()> {
     let test_db_conn = test_db_conn?;
-    let brokerage_account = brokerage_account(test_db_conn.db_conn);
-    test_db_conn.db_conn.insert_bacct(brokerage_account).await?;
+    let brokerage_account = brokerage_account(&test_db_conn.db_conn);
+    test_db_conn
+        .db_conn
+        .insert_bacct(&brokerage_account)
+        .await?;
 
     let found_account = test_db_conn
         .db_conn
         .find_bacct_by_brokerage_and_account_id(BROKERAGE_ID, BROKERAGE_ACCOUNT_ID)
         .await?;
-
     assert!(found_account.is_some());
-    assert_eq!(brokerage_account, found_account.unwrap());
+    let found_account = found_account.unwrap();
+
+    assert_eq!(brokerage_account.account_id(), found_account.account_id());
+    assert_eq!(
+        brokerage_account.brokerage_id(),
+        found_account.brokerage_id()
+    );
 
     Ok(())
 }
@@ -284,14 +287,14 @@ async fn find_all_brokerage_accounts_works(
 #[tokio::test]
 async fn insert_duplicate_brokerage_account_fails(
     #[future] test_db_conn_old: Result<DbConnectionOld>,
-    brokerage_account: BrokerageAccount,
+    brokerage_account_old: BrokerageAccount,
 ) -> Result<()> {
     let dbc = test_db_conn_old?;
 
     // Insert it once.
-    brokerage_account.insert(&dbc.db, None).await?;
+    brokerage_account_old.insert(&dbc.db, None).await?;
     // And again.
-    let result = brokerage_account.insert(&dbc.db, None).await;
+    let result = brokerage_account_old.insert(&dbc.db, None).await;
 
     assert!(result.is_err());
 

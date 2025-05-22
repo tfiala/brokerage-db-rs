@@ -11,7 +11,7 @@ mod account;
 pub struct DynamoDbConnection {}
 
 #[async_trait]
-impl DbConnection<String> for DynamoDbConnection {
+impl DbConnection for DynamoDbConnection {
     //
     // Migrations
     //
@@ -31,11 +31,11 @@ impl DbConnection<String> for DynamoDbConnection {
         &self,
         account_id: &str,
         brokerage_id: &str,
-    ) -> Box<dyn IBrokerageAccount<String> + Send> {
+    ) -> Box<dyn IBrokerageAccount + Send> {
         Box::new(DynamoDbBrokerageAccount::new(brokerage_id, account_id))
     }
 
-    async fn insert_bacct(&self, _bacct: Box<dyn IBrokerageAccount<String> + Send>) -> Result<()> {
+    async fn insert_bacct(&self, _bacct: &Box<dyn IBrokerageAccount>) -> Result<()> {
         // let mdb_bacct = bacct
         //     .as_any()
         //     .downcast_ref::<DynamoDbBrokerageAccount>()
@@ -51,11 +51,11 @@ impl DbConnection<String> for DynamoDbConnection {
         // Ok(())
     }
 
-    async fn update_bacct(&self, _bacct: Box<dyn IBrokerageAccount<String> + Send>) -> Result<()> {
+    async fn update_bacct(&self, _bacct: Box<dyn IBrokerageAccount>) -> Result<()> {
         todo!()
     }
 
-    async fn find_bacct_all(&self) -> Result<Vec<Box<dyn IBrokerageAccount<String>>>> {
+    async fn find_bacct_all(&self) -> Result<Vec<Box<dyn IBrokerageAccount>>> {
         todo!()
         // let mdb_baccts = self
         //     .db
@@ -78,7 +78,7 @@ impl DbConnection<String> for DynamoDbConnection {
         &self,
         _brokerage_id: &str,
         _account_id: &str,
-    ) -> Result<Option<Box<dyn IBrokerageAccount<String>>>> {
+    ) -> Result<Option<Box<dyn IBrokerageAccount>>> {
         todo!()
         // let result = self
         //     .db
@@ -94,21 +94,21 @@ impl DbConnection<String> for DynamoDbConnection {
         // }
     }
 
-    async fn find_bacct_by_dbid(
-        &self,
-        _dbid: &String,
-    ) -> Result<Option<Box<dyn IBrokerageAccount<String>>>> {
-        todo!()
-        // let result = self
-        //     .db
-        //     .collection::<MdbBrokerageAccount>(MdbBrokerageAccount::COLLECTION_NAME)
-        //     .find_one(bson::doc! {"_id": dbid})
-        //     .await?;
+    // async fn find_bacct_by_dbid(
+    //     &self,
+    //     _dbid: &String,
+    // ) -> Result<Option<Box<dyn IBrokerageAccount<String>>>> {
+    //     todo!()
+    //     // let result = self
+    //     //     .db
+    //     //     .collection::<MdbBrokerageAccount>(MdbBrokerageAccount::COLLECTION_NAME)
+    //     //     .find_one(bson::doc! {"_id": dbid})
+    //     //     .await?;
 
-        // if let Some(bacct) = result {
-        //     Ok(Some(Box::new(bacct)))
-        // } else {
-        //     Ok(None)
-        // }
-    }
+    //     // if let Some(bacct) = result {
+    //     //     Ok(Some(Box::new(bacct)))
+    //     // } else {
+    //     //     Ok(None)
+    //     // }
+    // }
 }

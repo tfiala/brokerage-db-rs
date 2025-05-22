@@ -10,9 +10,8 @@ use tokio::sync::Mutex;
 use crate::db_util;
 
 #[async_trait]
-pub trait IBrokerageAccount<I> {
+pub trait IBrokerageAccount: Send + Debug + Sync{
     fn as_any(&self) -> &dyn Any;
-    fn dbid(&self) -> &I;
 
     fn account_id(&self) -> &str;
     fn brokerage_id(&self) -> &str;

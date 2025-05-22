@@ -10,13 +10,9 @@ pub struct DynamoDbBrokerageAccount {
     pub brokerage_id: String,
 }
 
-impl IBrokerageAccount<String> for DynamoDbBrokerageAccount {
+impl IBrokerageAccount for DynamoDbBrokerageAccount {
     fn as_any(&self) -> &dyn Any {
         self
-    }
-
-    fn dbid(&self) -> &String {
-        &self.dbid
     }
 
     fn account_id(&self) -> &str {

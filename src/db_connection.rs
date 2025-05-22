@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use crate::account::IBrokerageAccount;
 
 #[async_trait]
-pub trait DbConnection<I> {
+pub trait DbConnection {
     //
     // Migrations
     //
@@ -19,15 +19,15 @@ pub trait DbConnection<I> {
         &self,
         account_id: &str,
         brokerage_id: &str,
-    ) -> Box<dyn IBrokerageAccount<I> + Send>;
-    async fn insert_bacct(&self, bacct: Box<dyn IBrokerageAccount<I> + Send>) -> Result<()>;
-    async fn update_bacct(&self, bacct: Box<dyn IBrokerageAccount<I> + Send>) -> Result<()>;
+    ) -> Box<dyn IBrokerageAccount + Send>;
+    async fn insert_bacct(&self, bacct: &Box<dyn IBrokerageAccount>) -> Result<()>;
+    async fn update_bacct(&self, bacct: Box<dyn IBrokerageAccount>) -> Result<()>;
 
-    async fn find_bacct_all(&self) -> Result<Vec<Box<dyn IBrokerageAccount<I>>>>;
+    async fn find_bacct_all(&self) -> Result<Vec<Box<dyn IBrokerageAccount>>>;
     async fn find_bacct_by_brokerage_and_account_id(
         &self,
         brokerage_id: &str,
         account_id: &str,
-    ) -> Result<Option<Box<dyn IBrokerageAccount<I>>>>;
-    async fn find_bacct_by_dbid(&self, dbid: &I) -> Result<Option<Box<dyn IBrokerageAccount<I>>>>;
+    ) -> Result<Option<Box<dyn IBrokerageAccount>>>;
+    // async fn find_bacct_by_dbid(&self, dbid: &I) -> Result<Option<Box<dyn IBrokerageAccount>>>;
 }

@@ -6,17 +6,17 @@ use async_trait::async_trait;
 use crate::db_connection::DbConnection;
 
 #[async_trait]
-pub trait DbConnectionFactory<I> {
+pub trait DbConnectionFactory {
     fn id(&self) -> &'static str;
-    async fn create(&self) -> Result<Box<dyn DbConnection<I>>>;
+    async fn create(&self) -> Result<Box<dyn DbConnection>>;
 }
 
-pub struct DbConnectionFactoryManager<I> {
-    factories: HashMap<&'static str, Box<dyn DbConnectionFactory<I>>>,
+pub struct DbConnectionFactoryManager {
+    factories: HashMap<&'static str, Box<dyn DbConnectionFactory>>,
 }
 
-impl<I> DbConnectionFactoryManager<I> {
-    pub fn register_factory(&mut self, factory: Box<dyn DbConnectionFactory<I>>) {
+impl DbConnectionFactoryManager {
+    pub fn register_factory(&mut self, factory: Box<dyn DbConnectionFactory>) {
         self.factories.insert(factory.id(), factory);
     }
 }
