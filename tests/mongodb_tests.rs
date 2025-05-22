@@ -330,6 +330,42 @@ async fn find_all_brokerage_accounts_works_old(
 #[awt]
 #[tokio::test]
 async fn insert_duplicate_brokerage_account_fails(
+    #[future] test_db_conn: Result<TestDbConnection>,
+) -> Result<()> {
+    let test_db_conn = test_db_conn?;
+    let brokerage_account = brokerage_account(test_db_conn.db_conn.as_ref());
+
+    // Insert it once.
+    test_db_conn
+        .db_conn
+        .insert_bacct(brokerage_account.as_ref())
+        .await?;
+
+    // Insert it again.
+    let result = test_db_conn
+        .db_conn
+        .insert_bacct(brokerage_account.as_ref())
+        .await;
+
+    assert!(result.is_err());
+
+    let expected_error = result.unwrap_err().downcast::<Error>();
+    assert!(expected_error.is_ok());
+    let kind = expected_error.unwrap().kind;
+    match *kind {
+        ErrorKind::Write(WriteFailure::WriteError(write_error)) => {
+            assert_eq!(write_error.code, 11000);
+        }
+        _ => panic!("Expected a WriteError with code 11000"),
+    }
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[tokio::test]
+async fn insert_duplicate_brokerage_account_fails_old(
     #[future] test_db_conn_old: Result<DbConnectionOld>,
     brokerage_account_old: BrokerageAccount,
 ) -> Result<()> {
