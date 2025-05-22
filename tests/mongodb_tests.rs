@@ -100,11 +100,11 @@ const BROKERAGE_ACCOUNT_ID: &str = "A1234567";
 const BROKERAGE_ID_2: &str = "another-broker";
 const BROKERAGE_ACCOUNT_ID_2: &str = "DA7654321";
 
-fn brokerage_account(db_conn: &Box<dyn DbConnection>) -> Box<dyn IBrokerageAccount> {
+fn brokerage_account(db_conn: &dyn DbConnection) -> Box<dyn IBrokerageAccount> {
     db_conn.new_brokerage_account(BROKERAGE_ACCOUNT_ID, BROKERAGE_ID)
 }
 
-// fn brokerage_account_2(db_conn: &Box<dyn DbConnection>) -> Box<dyn IBrokerageAccount> {
+// fn brokerage_account_2(db_conn: &dyn DbConnection) -> Box<dyn IBrokerageAccount> {
 //     db_conn.new_brokerage_account(BROKERAGE_ACCOUNT_ID_2, BROKERAGE_ID_2)
 // }
 
@@ -216,10 +216,10 @@ async fn insert_brokerage_account_works(
     #[future] test_db_conn: Result<TestDbConnection>,
 ) -> Result<()> {
     let test_db_conn = test_db_conn?;
-    let brokerage_account = brokerage_account(&test_db_conn.db_conn);
+    let brokerage_account = brokerage_account(test_db_conn.db_conn.as_ref());
     test_db_conn
         .db_conn
-        .insert_bacct(&brokerage_account)
+        .insert_bacct(brokerage_account.as_ref())
         .await?;
 
     let found_account = test_db_conn

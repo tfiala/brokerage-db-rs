@@ -20,8 +20,8 @@ pub trait DbConnection {
         account_id: &str,
         brokerage_id: &str,
     ) -> Box<dyn IBrokerageAccount + Send>;
-    async fn insert_bacct(&self, bacct: &Box<dyn IBrokerageAccount>) -> Result<()>;
-    async fn update_bacct(&self, bacct: Box<dyn IBrokerageAccount>) -> Result<()>;
+    async fn insert_bacct(&self, bacct: &dyn IBrokerageAccount) -> Result<()>;
+    async fn update_bacct(&self, bacct: &dyn IBrokerageAccount) -> Result<()>;
 
     async fn find_bacct_all(&self) -> Result<Vec<Box<dyn IBrokerageAccount>>>;
     async fn find_bacct_by_brokerage_and_account_id(

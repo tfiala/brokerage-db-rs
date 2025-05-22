@@ -35,7 +35,7 @@ impl DbConnection for DynamoDbConnection {
         Box::new(DynamoDbBrokerageAccount::new(brokerage_id, account_id))
     }
 
-    async fn insert_bacct(&self, _bacct: &Box<dyn IBrokerageAccount>) -> Result<()> {
+    async fn insert_bacct(&self, _bacct: &dyn IBrokerageAccount) -> Result<()> {
         // let mdb_bacct = bacct
         //     .as_any()
         //     .downcast_ref::<DynamoDbBrokerageAccount>()
@@ -51,7 +51,7 @@ impl DbConnection for DynamoDbConnection {
         // Ok(())
     }
 
-    async fn update_bacct(&self, _bacct: Box<dyn IBrokerageAccount>) -> Result<()> {
+    async fn update_bacct(&self, _bacct: &dyn IBrokerageAccount) -> Result<()> {
         todo!()
     }
 

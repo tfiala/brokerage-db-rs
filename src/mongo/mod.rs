@@ -78,7 +78,7 @@ impl DbConnection for MdbDbConnection {
         })
     }
 
-    async fn insert_bacct(&self, bacct: &Box<dyn IBrokerageAccount>) -> Result<()> {
+    async fn insert_bacct(&self, bacct: &dyn IBrokerageAccount) -> Result<()> {
         let mdb_bacct = bacct
             .as_any()
             .downcast_ref::<MdbBrokerageAccount>()
@@ -95,10 +95,7 @@ impl DbConnection for MdbDbConnection {
         Ok(())
     }
 
-    async fn update_bacct(
-        &self,
-        _bacct: Box<dyn IBrokerageAccount>,
-    ) -> Result<()> {
+    async fn update_bacct(&self, _bacct: &dyn IBrokerageAccount) -> Result<()> {
         todo!()
     }
 
