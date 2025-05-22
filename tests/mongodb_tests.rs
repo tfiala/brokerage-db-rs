@@ -104,9 +104,9 @@ fn brokerage_account(db_conn: &dyn DbConnection) -> Box<dyn IBrokerageAccount> {
     db_conn.new_brokerage_account(BROKERAGE_ACCOUNT_ID, BROKERAGE_ID)
 }
 
-// fn brokerage_account_2(db_conn: &dyn DbConnection) -> Box<dyn IBrokerageAccount> {
-//     db_conn.new_brokerage_account(BROKERAGE_ACCOUNT_ID_2, BROKERAGE_ID_2)
-// }
+fn brokerage_account_2(db_conn: &dyn DbConnection) -> Box<dyn IBrokerageAccount> {
+    db_conn.new_brokerage_account(BROKERAGE_ACCOUNT_ID_2, BROKERAGE_ID_2)
+}
 
 #[fixture]
 fn brokerage_account_old() -> BrokerageAccount {
@@ -266,6 +266,50 @@ async fn insert_brokerage_account_works_old(
 #[awt]
 #[tokio::test]
 async fn find_all_brokerage_accounts_works(
+    #[future] test_db_conn: Result<TestDbConnection>,
+) -> Result<()> {
+    let test_db_conn = test_db_conn.unwrap();
+
+    let brokerage_account = brokerage_account(test_db_conn.db_conn.as_ref());
+    test_db_conn
+        .db_conn
+        .insert_bacct(brokerage_account.as_ref())
+        .await?;
+
+    let brokerage_account_2 = brokerage_account_2(test_db_conn.db_conn.as_ref());
+    test_db_conn
+        .db_conn
+        .insert_bacct(brokerage_account_2.as_ref())
+        .await?;
+
+    let found_accounts = test_db_conn.db_conn.find_bacct_all().await?;
+
+    assert_eq!(found_accounts.len(), 2);
+
+    assert!(
+        brokerage_account.account_id() == found_accounts[0].account_id()
+            || brokerage_account.account_id() == found_accounts[1].account_id()
+    );
+    assert!(
+        brokerage_account.brokerage_id() == found_accounts[0].brokerage_id()
+            || brokerage_account.brokerage_id() == found_accounts[1].brokerage_id()
+    );
+
+    assert!(
+        brokerage_account_2.account_id() == found_accounts[0].account_id()
+            || brokerage_account_2.account_id() == found_accounts[1].account_id()
+    );
+    assert!(
+        brokerage_account_2.brokerage_id() == found_accounts[0].brokerage_id()
+            || brokerage_account_2.brokerage_id() == found_accounts[1].brokerage_id()
+    );
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[tokio::test]
+async fn find_all_brokerage_accounts_works_old(
     #[future] test_db_conn_old: Result<DbConnectionOld>,
     brokerage_account_old: BrokerageAccount,
     brokerage_account_2_old: BrokerageAccount,
