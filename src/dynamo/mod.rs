@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use aws_sdk_dynamodb::Client;
 
 use crate::{account::IBrokerageAccount, db_connection::DbConnection};
-use account::DynamoDbBrokerageAccount;
+use account::DynamoBrokerageAccount;
 
 mod account;
 mod migrations;
@@ -46,7 +46,7 @@ impl DbConnection for DynamoDbConnection {
         account_id: &str,
         brokerage_id: &str,
     ) -> Box<dyn IBrokerageAccount + Send> {
-        Box::new(DynamoDbBrokerageAccount::new(brokerage_id, account_id))
+        Box::new(DynamoBrokerageAccount::new(brokerage_id, account_id))
     }
 
     async fn insert_bacct(&self, _bacct: &dyn IBrokerageAccount) -> Result<()> {
