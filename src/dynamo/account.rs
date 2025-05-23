@@ -42,7 +42,8 @@ impl DynamoBrokerageAccount {
     }
 
     pub fn pk(brokerage_id: &str, account_id: &str) -> String {
-        format!("{}#{}", brokerage_id, account_id)
+        // Use account_id first to increase distribution.
+        format!("{}#{}", account_id, brokerage_id)
     }
 }
 

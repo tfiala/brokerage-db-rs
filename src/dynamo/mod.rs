@@ -112,7 +112,11 @@ impl DbConnection for DynamoDbConnection {
             .item(
                 DynamoBrokerageAccount::BROKERAGE_ID_COL_NAME,
                 brokerage_id_av,
-            );
+            )
+            .condition_expression(format!(
+                "attribute_not_exists({})",
+                DynamoBrokerageAccount::PK_COL_NAME
+            ));
 
         debug!("dynamodb: inserting brokerage account: {:?}", request);
 

@@ -121,3 +121,29 @@ async fn insert_brokerage_account_works(
 
     Ok(())
 }
+
+#[rstest]
+#[awt]
+#[tokio::test]
+async fn insert_duplicate_brokerage_account_fails(
+    #[future] test_db_conn: Result<TestDbConnection>,
+) -> Result<()> {
+    let test_db_conn = test_db_conn?;
+    let brokerage_account = brokerage_account(test_db_conn.db_conn.as_ref());
+
+    // Insert it once.
+    test_db_conn
+        .db_conn
+        .insert_bacct(brokerage_account.as_ref())
+        .await?;
+
+    // Insert it again.
+    let result = test_db_conn
+        .db_conn
+        .insert_bacct(brokerage_account.as_ref())
+        .await;
+
+    assert!(result.is_err());
+
+    Ok(())
+}
