@@ -1,6 +1,7 @@
 use anyhow::Result;
 use brokerage_db::{
-    db_connection::DbConnection, db_connection_factory::DbConnectionFactory, dynamo,
+    account::IBrokerageAccount, db_connection::DbConnection,
+    db_connection_factory::DbConnectionFactory, dynamo,
 };
 use rstest::{fixture, rstest};
 use testcontainers::core::IntoContainerPort;
@@ -8,6 +9,7 @@ use testcontainers_modules::{
     dynamodb_local::DynamoDb,
     testcontainers::{ContainerAsync, runners::AsyncRunner},
 };
+use tracing_test::traced_test;
 
 pub struct TestDbConnection {
     pub node: ContainerAsync<DynamoDb>,
@@ -52,6 +54,20 @@ async fn test_db_conn() -> Result<TestDbConnection> {
     Ok(test_db_conn)
 }
 
+const BROKERAGE_ID: &str = "batch-brokers";
+const BROKERAGE_ACCOUNT_ID: &str = "A1234567";
+
+// const BROKERAGE_ID_2: &str = "another-broker";
+// const BROKERAGE_ACCOUNT_ID_2: &str = "DA7654321";
+
+fn brokerage_account(db_conn: &dyn DbConnection) -> Box<dyn IBrokerageAccount> {
+    db_conn.new_brokerage_account(BROKERAGE_ACCOUNT_ID, BROKERAGE_ID)
+}
+
+// fn brokerage_account_2(db_conn: &dyn DbConnection) -> Box<dyn IBrokerageAccount> {
+//     db_conn.new_brokerage_account(BROKERAGE_ACCOUNT_ID_2, BROKERAGE_ID_2)
+// }
+
 #[tokio::test]
 async fn test_succeeds() -> Result<()> {
     Ok(())
@@ -70,7 +86,38 @@ async fn empty_dynamodb_connection_succeeds(
 #[rstest]
 #[awt]
 #[tokio::test]
+#[traced_test]
 async fn migrations_succeed(#[future] test_db_conn: Result<TestDbConnection>) -> Result<()> {
     let _test_db_conn = test_db_conn.unwrap();
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[tokio::test]
+#[traced_test]
+async fn insert_brokerage_account_works(
+    #[future] test_db_conn: Result<TestDbConnection>,
+) -> Result<()> {
+    let test_db_conn = test_db_conn?;
+    let brokerage_account = brokerage_account(test_db_conn.db_conn.as_ref());
+    test_db_conn
+        .db_conn
+        .insert_bacct(brokerage_account.as_ref())
+        .await?;
+
+    let found_account = test_db_conn
+        .db_conn
+        .find_bacct_by_brokerage_and_account_id(BROKERAGE_ID, BROKERAGE_ACCOUNT_ID)
+        .await?;
+    assert!(found_account.is_some());
+    let found_account = found_account.unwrap();
+
+    assert_eq!(brokerage_account.account_id(), found_account.account_id());
+    assert_eq!(
+        brokerage_account.brokerage_id(),
+        found_account.brokerage_id()
+    );
+
     Ok(())
 }

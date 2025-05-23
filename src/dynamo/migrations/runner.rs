@@ -1,6 +1,7 @@
 use super::Migration;
 use anyhow::Result;
 use aws_sdk_dynamodb::Client;
+use tracing::{debug, info, warn};
 
 pub struct Runner {
     migrations: Vec<Box<dyn Migration>>,
@@ -8,18 +9,14 @@ pub struct Runner {
 
 impl Runner {
     pub fn new(migrations: Vec<Box<dyn Migration>>) -> Self {
+        info!("Creating runner with {} migrations", migrations.len());
         Self { migrations }
     }
 
     pub async fn up(&self, client: &Client) -> Result<()> {
+        debug!("Runner running {} migrations", self.migrations.len());
         for migration in self.migrations.iter() {
-            let result = migration.up(client).await;
-            if result.is_err() {
-                tracing::warn!(
-                    "migration up {} failed, stopping further migrations",
-                    migration.id()
-                )
-            }
+            migration.up(client).await?;
         }
         Ok(())
     }
@@ -27,11 +24,11 @@ impl Runner {
     pub async fn down(&self, client: &Client) -> Result<()> {
         for migration in self.migrations.iter().rev() {
             let result = migration.down(client).await;
-            if result.is_err() {
-                tracing::warn!(
-                    "migration down {} failed, stopping further migrations",
-                    migration.id()
-                )
+            if result.is_ok() {
+                debug!("migration up {} succeeded", migration.id());
+            } else {
+                warn!("migration up {} failed", migration.id());
+                break;
             }
         }
         Ok(())
