@@ -12,14 +12,14 @@ use bson::oid::ObjectId;
 use futures::TryStreamExt;
 use mongodb::{Client, Database};
 
-pub struct MdbDbConnectionFactory {
+pub struct MdbConnectionFactory {
     uri: String,
     db_name: String,
 }
 
-impl MdbDbConnectionFactory {
+impl MdbConnectionFactory {
     pub fn new(uri: &str, db_name: &str) -> Self {
-        MdbDbConnectionFactory {
+        Self {
             db_name: db_name.to_owned(),
             uri: uri.to_owned(),
         }
@@ -27,7 +27,7 @@ impl MdbDbConnectionFactory {
 }
 
 #[async_trait]
-impl DbConnectionFactory for MdbDbConnectionFactory {
+impl DbConnectionFactory for MdbConnectionFactory {
     fn id(&self) -> &'static str {
         "mongodb"
     }

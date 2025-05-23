@@ -1,22 +1,99 @@
 use anyhow::Result;
 use brokerage_db::{
-    account::{BrokerageAccount, IBrokerageAccount},
+    account::BrokerageAccount,
     db_connection::DbConnection,
     db_connection_factory::DbConnectionFactory,
-    initialize, mongo, remove_data,
+    initialize,
+    mongo::MdbConnectionFactory,
+    remove_data,
     security::{Security, SecurityType},
     trade_execution::{self, TradeExecution, TradeSide},
 };
+use common::CommonTests;
 use mongodb::{
     Client, Database,
     error::{Error, ErrorKind, WriteFailure},
 };
 use rstest::{fixture, rstest};
+use testcontainers::core::IntoContainerPort;
 use testcontainers_modules::{
     mongo::Mongo,
     testcontainers::{ContainerAsync, runners::AsyncRunner},
 };
-// use tracing_test::traced_test;
+
+mod common;
+
+#[fixture]
+async fn common_tests() -> Result<CommonTests<Mongo>> {
+    // Create the test container.
+    let node = Mongo::default().start().await?;
+
+    // Set up AWS endpoint.
+    let host = node.get_host().await?;
+    let host_port = node.get_host_port_ipv4(27017.tcp()).await?;
+    let mongo_uri = format!("mongodb://{host}:{host_port}");
+
+    // Get the MongoDB db connection factory.
+    let factory = MdbConnectionFactory::new(&mongo_uri, "test");
+
+    // Create the db connection.
+    let db_conn = factory.create().await?;
+
+    // Run migrations.
+    db_conn.run_migrations().await?;
+
+    Ok(CommonTests::new(db_conn, node))
+}
+
+#[rstest]
+#[awt]
+#[tokio::test]
+async fn migrations_succeed(#[future] common_tests: Result<CommonTests<Mongo>>) -> Result<()> {
+    let _common_tests = common_tests.unwrap();
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[tokio::test]
+async fn insert_brokerage_account_works(
+    #[future] common_tests: Result<CommonTests<Mongo>>,
+) -> Result<()> {
+    common_tests
+        .unwrap()
+        .insert_brokerage_account_works()
+        .await?;
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[tokio::test]
+async fn insert_duplicate_brokerage_account_fails(
+    #[future] common_tests: Result<CommonTests<Mongo>>,
+) -> Result<()> {
+    common_tests
+        .unwrap()
+        .insert_duplicate_brokerage_account_fails()
+        .await?;
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[tokio::test]
+async fn find_all_brokerage_accounts_works(
+    #[future] common_tests: Result<CommonTests<Mongo>>,
+) -> Result<()> {
+    common_tests
+        .unwrap()
+        .find_all_brokerage_accounts_works()
+        .await?;
+
+    Ok(())
+}
 
 struct TestDbConnection {
     db_conn: Box<dyn DbConnection>,
@@ -29,7 +106,7 @@ impl TestDbConnection {
         let host_port = node.get_host_port_ipv4(27017).await?;
 
         let uri = format!("mongodb://localhost:{}/", host_port);
-        let factory = mongo::MdbDbConnectionFactory::new(&uri, db_name);
+        let factory = MdbConnectionFactory::new(&uri, db_name);
         let db_conn = factory.create().await?;
 
         Ok(Self {
@@ -100,14 +177,6 @@ const BROKERAGE_ACCOUNT_ID: &str = "A1234567";
 const BROKERAGE_ID_2: &str = "another-broker";
 const BROKERAGE_ACCOUNT_ID_2: &str = "DA7654321";
 
-fn brokerage_account(db_conn: &dyn DbConnection) -> Box<dyn IBrokerageAccount> {
-    db_conn.new_brokerage_account(BROKERAGE_ACCOUNT_ID, BROKERAGE_ID)
-}
-
-fn brokerage_account_2(db_conn: &dyn DbConnection) -> Box<dyn IBrokerageAccount> {
-    db_conn.new_brokerage_account(BROKERAGE_ACCOUNT_ID_2, BROKERAGE_ID_2)
-}
-
 #[fixture]
 fn brokerage_account_old() -> BrokerageAccount {
     BrokerageAccount::new(BROKERAGE_ID, BROKERAGE_ACCOUNT_ID)
@@ -170,15 +239,6 @@ async fn test_mongodb_container_connection(
 #[rstest]
 #[awt]
 #[tokio::test]
-async fn test_migration_succeeds(
-    #[future] empty_test_db_conn: Result<TestDbConnection>,
-) -> Result<()> {
-    empty_test_db_conn.unwrap().db_conn.run_migrations().await
-}
-
-#[rstest]
-#[awt]
-#[tokio::test]
 async fn test_migration_succeeds_old(
     #[future] empty_test_db_conn_old: Result<DbConnectionOld>,
 ) -> Result<()> {
@@ -212,35 +272,6 @@ async fn test_down_migration_succeeds(
 #[rstest]
 #[awt]
 #[tokio::test]
-async fn insert_brokerage_account_works(
-    #[future] test_db_conn: Result<TestDbConnection>,
-) -> Result<()> {
-    let test_db_conn = test_db_conn?;
-    let brokerage_account = brokerage_account(test_db_conn.db_conn.as_ref());
-    test_db_conn
-        .db_conn
-        .insert_bacct(brokerage_account.as_ref())
-        .await?;
-
-    let found_account = test_db_conn
-        .db_conn
-        .find_bacct_by_brokerage_and_account_id(BROKERAGE_ID, BROKERAGE_ACCOUNT_ID)
-        .await?;
-    assert!(found_account.is_some());
-    let found_account = found_account.unwrap();
-
-    assert_eq!(brokerage_account.account_id(), found_account.account_id());
-    assert_eq!(
-        brokerage_account.brokerage_id(),
-        found_account.brokerage_id()
-    );
-
-    Ok(())
-}
-
-#[rstest]
-#[awt]
-#[tokio::test]
 async fn insert_brokerage_account_works_old(
     #[future] test_db_conn_old: Result<DbConnectionOld>,
     brokerage_account_old: BrokerageAccount,
@@ -265,50 +296,6 @@ async fn insert_brokerage_account_works_old(
 #[rstest]
 #[awt]
 #[tokio::test]
-async fn find_all_brokerage_accounts_works(
-    #[future] test_db_conn: Result<TestDbConnection>,
-) -> Result<()> {
-    let test_db_conn = test_db_conn.unwrap();
-
-    let brokerage_account = brokerage_account(test_db_conn.db_conn.as_ref());
-    test_db_conn
-        .db_conn
-        .insert_bacct(brokerage_account.as_ref())
-        .await?;
-
-    let brokerage_account_2 = brokerage_account_2(test_db_conn.db_conn.as_ref());
-    test_db_conn
-        .db_conn
-        .insert_bacct(brokerage_account_2.as_ref())
-        .await?;
-
-    let found_accounts = test_db_conn.db_conn.find_bacct_all().await?;
-
-    assert_eq!(found_accounts.len(), 2);
-
-    assert!(
-        brokerage_account.account_id() == found_accounts[0].account_id()
-            || brokerage_account.account_id() == found_accounts[1].account_id()
-    );
-    assert!(
-        brokerage_account.brokerage_id() == found_accounts[0].brokerage_id()
-            || brokerage_account.brokerage_id() == found_accounts[1].brokerage_id()
-    );
-
-    assert!(
-        brokerage_account_2.account_id() == found_accounts[0].account_id()
-            || brokerage_account_2.account_id() == found_accounts[1].account_id()
-    );
-    assert!(
-        brokerage_account_2.brokerage_id() == found_accounts[0].brokerage_id()
-            || brokerage_account_2.brokerage_id() == found_accounts[1].brokerage_id()
-    );
-    Ok(())
-}
-
-#[rstest]
-#[awt]
-#[tokio::test]
 async fn find_all_brokerage_accounts_works_old(
     #[future] test_db_conn_old: Result<DbConnectionOld>,
     brokerage_account_old: BrokerageAccount,
@@ -322,42 +309,6 @@ async fn find_all_brokerage_accounts_works_old(
 
     assert!(found_accounts.contains(&brokerage_account_old));
     assert!(found_accounts.contains(&brokerage_account_2_old));
-
-    Ok(())
-}
-
-#[rstest]
-#[awt]
-#[tokio::test]
-async fn insert_duplicate_brokerage_account_fails(
-    #[future] test_db_conn: Result<TestDbConnection>,
-) -> Result<()> {
-    let test_db_conn = test_db_conn?;
-    let brokerage_account = brokerage_account(test_db_conn.db_conn.as_ref());
-
-    // Insert it once.
-    test_db_conn
-        .db_conn
-        .insert_bacct(brokerage_account.as_ref())
-        .await?;
-
-    // Insert it again.
-    let result = test_db_conn
-        .db_conn
-        .insert_bacct(brokerage_account.as_ref())
-        .await;
-
-    assert!(result.is_err());
-
-    let expected_error = result.unwrap_err().downcast::<Error>();
-    assert!(expected_error.is_ok());
-    let kind = expected_error.unwrap().kind;
-    match *kind {
-        ErrorKind::Write(WriteFailure::WriteError(write_error)) => {
-            assert_eq!(write_error.code, 11000);
-        }
-        _ => panic!("Expected a WriteError with code 11000"),
-    }
 
     Ok(())
 }
