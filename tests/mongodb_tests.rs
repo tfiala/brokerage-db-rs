@@ -1,28 +1,141 @@
 use anyhow::Result;
 use brokerage_db::{
     account::BrokerageAccount,
-    initialize, remove_data,
+    db_connection::DbConnection,
+    db_connection_factory::DbConnectionFactory,
+    initialize,
+    mongo::MdbConnectionFactory,
+    remove_data,
     security::{Security, SecurityType},
     trade_execution::{self, TradeExecution, TradeSide},
 };
+use common::CommonTests;
 use mongodb::{
     Client, Database,
     error::{Error, ErrorKind, WriteFailure},
 };
 use rstest::{fixture, rstest};
+use testcontainers::core::IntoContainerPort;
 use testcontainers_modules::{
     mongo::Mongo,
     testcontainers::{ContainerAsync, runners::AsyncRunner},
 };
-use tracing_test::traced_test;
 
-pub struct DbConnection {
+mod common;
+
+#[fixture]
+async fn common_tests() -> Result<CommonTests<Mongo>> {
+    // Create the test container.
+    let node = Mongo::default().start().await?;
+
+    // Set up AWS endpoint.
+    let host = node.get_host().await?;
+    let host_port = node.get_host_port_ipv4(27017.tcp()).await?;
+    let mongo_uri = format!("mongodb://{host}:{host_port}");
+
+    // Get the MongoDB db connection factory.
+    let factory = MdbConnectionFactory::new(&mongo_uri, "test");
+
+    // Create the db connection.
+    let db_conn = factory.create().await?;
+
+    // Run migrations.
+    db_conn.run_migrations().await?;
+
+    Ok(CommonTests::new(db_conn, node))
+}
+
+#[rstest]
+#[awt]
+#[tokio::test]
+async fn migrations_succeed(#[future] common_tests: Result<CommonTests<Mongo>>) -> Result<()> {
+    let _common_tests = common_tests.unwrap();
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[tokio::test]
+async fn insert_brokerage_account_works(
+    #[future] common_tests: Result<CommonTests<Mongo>>,
+) -> Result<()> {
+    common_tests
+        .unwrap()
+        .insert_brokerage_account_works()
+        .await?;
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[tokio::test]
+async fn insert_duplicate_brokerage_account_fails(
+    #[future] common_tests: Result<CommonTests<Mongo>>,
+) -> Result<()> {
+    common_tests
+        .unwrap()
+        .insert_duplicate_brokerage_account_fails()
+        .await?;
+
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[tokio::test]
+async fn find_all_brokerage_accounts_works(
+    #[future] common_tests: Result<CommonTests<Mongo>>,
+) -> Result<()> {
+    common_tests
+        .unwrap()
+        .find_all_brokerage_accounts_works()
+        .await?;
+
+    Ok(())
+}
+
+struct TestDbConnection {
+    db_conn: Box<dyn DbConnection>,
+    _node: ContainerAsync<Mongo>,
+}
+
+impl TestDbConnection {
+    pub async fn new(db_name: &str) -> Result<Self> {
+        let node = Mongo::default().start().await?;
+        let host_port = node.get_host_port_ipv4(27017).await?;
+
+        let uri = format!("mongodb://localhost:{}/", host_port);
+        let factory = MdbConnectionFactory::new(&uri, db_name);
+        let db_conn = factory.create().await?;
+
+        Ok(Self {
+            db_conn,
+            _node: node,
+        })
+    }
+}
+
+#[fixture]
+async fn empty_test_db_conn() -> Result<TestDbConnection> {
+    TestDbConnection::new("test").await
+}
+
+#[fixture]
+async fn test_db_conn() -> Result<TestDbConnection> {
+    let test_db_conn = empty_test_db_conn().await?;
+    test_db_conn.db_conn.run_migrations().await?;
+
+    Ok(test_db_conn)
+}
+
+pub struct DbConnectionOld {
     pub client: Client,
     pub db: Database,
     pub node: ContainerAsync<Mongo>,
 }
 
-impl DbConnection {
+impl DbConnectionOld {
     pub async fn new(db_name: &str) -> Result<Self> {
         let node = Mongo::default().start().await?;
         let host_port = node.get_host_port_ipv4(27017).await?;
@@ -31,7 +144,7 @@ impl DbConnection {
         let client = mongodb::Client::with_uri_str(url).await?;
         let db = client.database(db_name);
 
-        Ok(DbConnection { client, db, node })
+        Ok(DbConnectionOld { client, db, node })
     }
 }
 
@@ -42,30 +155,36 @@ struct TradeExecutionDesc {
 }
 
 #[fixture]
-async fn empty_test_db_conn() -> Result<DbConnection> {
-    DbConnection::new("test").await
+async fn empty_test_db_conn_old() -> Result<DbConnectionOld> {
+    DbConnectionOld::new("test").await
 }
 
 #[fixture]
-async fn test_db_conn() -> Result<DbConnection> {
-    let db_conn = DbConnection::new("test").await?;
+async fn test_db_conn_old() -> Result<DbConnectionOld> {
+    let db_conn = DbConnectionOld::new("test").await?;
     initialize(&db_conn.db).await?;
     Ok(db_conn)
 }
 
 #[fixture]
-async fn admin_db_conn() -> Result<DbConnection> {
-    DbConnection::new("admin").await
+async fn admin_db_conn() -> Result<DbConnectionOld> {
+    DbConnectionOld::new("admin").await
+}
+
+const BROKERAGE_ID: &str = "batch-brokers";
+const BROKERAGE_ACCOUNT_ID: &str = "A1234567";
+
+const BROKERAGE_ID_2: &str = "another-broker";
+const BROKERAGE_ACCOUNT_ID_2: &str = "DA7654321";
+
+#[fixture]
+fn brokerage_account_old() -> BrokerageAccount {
+    BrokerageAccount::new(BROKERAGE_ID, BROKERAGE_ACCOUNT_ID)
 }
 
 #[fixture]
-fn brokerage_account() -> BrokerageAccount {
-    BrokerageAccount::new("batch-brokers", "A1234567")
-}
-
-#[fixture]
-fn brokerage_account_2() -> BrokerageAccount {
-    BrokerageAccount::new("another-broker", "G12-789-XYZ")
+fn brokerage_account_2_old() -> BrokerageAccount {
+    BrokerageAccount::new(BROKERAGE_ID_2, BROKERAGE_ACCOUNT_ID_2)
 }
 
 #[fixture]
@@ -105,7 +224,7 @@ fn trade_execution_desc() -> TradeExecutionDesc {
 #[awt]
 #[tokio::test]
 async fn test_mongodb_container_connection(
-    #[future] admin_db_conn: Result<DbConnection>,
+    #[future] admin_db_conn: Result<DbConnectionOld>,
 ) -> Result<()> {
     // Ping the server to check if the connection is successful
     let result = admin_db_conn
@@ -119,21 +238,21 @@ async fn test_mongodb_container_connection(
 
 #[rstest]
 #[awt]
-#[traced_test]
 #[tokio::test]
-async fn test_migration_succeeds(#[future] empty_test_db_conn: Result<DbConnection>) -> Result<()> {
-    initialize(&empty_test_db_conn.unwrap().db).await?;
+async fn test_migration_succeeds_old(
+    #[future] empty_test_db_conn_old: Result<DbConnectionOld>,
+) -> Result<()> {
+    initialize(&empty_test_db_conn_old.unwrap().db).await?;
     Ok(())
 }
 
 #[rstest]
 #[awt]
-#[traced_test]
 #[tokio::test]
-async fn test_down_migration_succeeds(
-    #[future] empty_test_db_conn: Result<DbConnection>,
+async fn test_down_migration_succeeds_old(
+    #[future] empty_test_db_conn_old: Result<DbConnectionOld>,
 ) -> Result<()> {
-    let dbc = empty_test_db_conn?;
+    let dbc = empty_test_db_conn_old?;
 
     initialize(&dbc.db).await?;
     remove_data(&dbc.db).await?;
@@ -142,64 +261,71 @@ async fn test_down_migration_succeeds(
 
 #[rstest]
 #[awt]
-#[traced_test]
 #[tokio::test]
-async fn insert_brokerage_account_works(
-    #[future] test_db_conn: Result<DbConnection>,
-    brokerage_account: BrokerageAccount,
+async fn test_down_migration_succeeds(
+    #[future] test_db_conn: Result<TestDbConnection>,
 ) -> Result<()> {
-    let dbc = test_db_conn?;
-    brokerage_account.insert(&dbc.db, None).await?;
+    let test_db_conn = test_db_conn.unwrap();
+    test_db_conn.db_conn.remove_migrations().await
+}
+
+#[rstest]
+#[awt]
+#[tokio::test]
+async fn insert_brokerage_account_works_old(
+    #[future] test_db_conn_old: Result<DbConnectionOld>,
+    brokerage_account_old: BrokerageAccount,
+) -> Result<()> {
+    let dbc = test_db_conn_old?;
+    brokerage_account_old.insert(&dbc.db, None).await?;
 
     let found_account = dbc
         .db
         .collection::<BrokerageAccount>(BrokerageAccount::COLLECTION_NAME)
         .find_one(bson::doc! {
-        "brokerage_id": brokerage_account.brokerage_id(),
-        "account_id": brokerage_account.account_id() })
+        "brokerage_id": brokerage_account_old.brokerage_id(),
+        "account_id": brokerage_account_old.account_id() })
         .await?
         .ok_or_else(|| anyhow::anyhow!("Brokerage account not found"))?;
 
-    assert_eq!(brokerage_account, found_account);
+    assert_eq!(brokerage_account_old, found_account);
 
     Ok(())
 }
 
 #[rstest]
 #[awt]
-#[traced_test]
 #[tokio::test]
-async fn find_all_brokerage_accounts_works(
-    #[future] test_db_conn: Result<DbConnection>,
-    brokerage_account: BrokerageAccount,
-    brokerage_account_2: BrokerageAccount,
+async fn find_all_brokerage_accounts_works_old(
+    #[future] test_db_conn_old: Result<DbConnectionOld>,
+    brokerage_account_old: BrokerageAccount,
+    brokerage_account_2_old: BrokerageAccount,
 ) -> Result<()> {
-    let dbc = test_db_conn?;
-    brokerage_account.insert(&dbc.db, None).await?;
-    brokerage_account_2.insert(&dbc.db, None).await?;
+    let dbc = test_db_conn_old?;
+    brokerage_account_old.insert(&dbc.db, None).await?;
+    brokerage_account_2_old.insert(&dbc.db, None).await?;
 
     let found_accounts = BrokerageAccount::find(&dbc.db).await?;
 
-    assert!(found_accounts.contains(&brokerage_account));
-    assert!(found_accounts.contains(&brokerage_account_2));
+    assert!(found_accounts.contains(&brokerage_account_old));
+    assert!(found_accounts.contains(&brokerage_account_2_old));
 
     Ok(())
 }
 
 #[rstest]
 #[awt]
-#[traced_test]
 #[tokio::test]
-async fn insert_duplicate_brokerage_account_fails(
-    #[future] test_db_conn: Result<DbConnection>,
-    brokerage_account: BrokerageAccount,
+async fn insert_duplicate_brokerage_account_fails_old(
+    #[future] test_db_conn_old: Result<DbConnectionOld>,
+    brokerage_account_old: BrokerageAccount,
 ) -> Result<()> {
-    let dbc = test_db_conn?;
+    let dbc = test_db_conn_old?;
 
     // Insert it once.
-    brokerage_account.insert(&dbc.db, None).await?;
+    brokerage_account_old.insert(&dbc.db, None).await?;
     // And again.
-    let result = brokerage_account.insert(&dbc.db, None).await;
+    let result = brokerage_account_old.insert(&dbc.db, None).await;
 
     assert!(result.is_err());
 
@@ -218,13 +344,12 @@ async fn insert_duplicate_brokerage_account_fails(
 
 #[rstest]
 #[awt]
-#[traced_test]
 #[tokio::test]
 async fn insert_security_works(
-    #[future] test_db_conn: Result<DbConnection>,
+    #[future] test_db_conn_old: Result<DbConnectionOld>,
     security: Security,
 ) -> Result<()> {
-    let dbc = test_db_conn?;
+    let dbc = test_db_conn_old?;
     security.insert(&dbc.db, None).await?;
 
     let found_security = Security::find_by_ticker_and_exchange(
@@ -242,13 +367,12 @@ async fn insert_security_works(
 
 #[rstest]
 #[awt]
-#[traced_test]
 #[tokio::test]
 async fn insert_security_with_conid_works(
-    #[future] test_db_conn: Result<DbConnection>,
+    #[future] test_db_conn_old: Result<DbConnectionOld>,
     security_with_conid: Security,
 ) -> Result<()> {
-    let dbc = test_db_conn?;
+    let dbc = test_db_conn_old?;
     security_with_conid.insert(&dbc.db, None).await?;
 
     let found_security = dbc
@@ -267,13 +391,12 @@ async fn insert_security_with_conid_works(
 
 #[rstest]
 #[awt]
-#[traced_test]
 #[tokio::test]
 async fn find_non_extant_security_fails(
-    #[future] test_db_conn: Result<DbConnection>,
+    #[future] test_db_conn_old: Result<DbConnectionOld>,
     security: Security,
 ) -> Result<()> {
-    let dbc = test_db_conn?;
+    let dbc = test_db_conn_old?;
     let result = Security::find_by_ticker_and_exchange(
         &dbc.db,
         security.ticker(),
@@ -289,13 +412,12 @@ async fn find_non_extant_security_fails(
 
 #[rstest]
 #[awt]
-#[traced_test]
 #[tokio::test]
 async fn find_security_with_ticker_and_exchange_works(
-    #[future] test_db_conn: Result<DbConnection>,
+    #[future] test_db_conn_old: Result<DbConnectionOld>,
     security: Security,
 ) -> Result<()> {
-    let dbc = test_db_conn?;
+    let dbc = test_db_conn_old?;
     security.insert(&dbc.db, None).await?;
 
     let result = Security::find_by_ticker_and_exchange(
@@ -315,13 +437,12 @@ async fn find_security_with_ticker_and_exchange_works(
 
 #[rstest]
 #[awt]
-#[traced_test]
 #[tokio::test]
 async fn find_security_with_ticker_and_one_match_works(
-    #[future] test_db_conn: Result<DbConnection>,
+    #[future] test_db_conn_old: Result<DbConnectionOld>,
     security: Security,
 ) -> Result<()> {
-    let dbc = test_db_conn?;
+    let dbc = test_db_conn_old?;
     security.insert(&dbc.db, None).await?;
 
     let result = Security::find_by_ticker(&dbc.db, security.ticker()).await;
@@ -336,13 +457,12 @@ async fn find_security_with_ticker_and_one_match_works(
 
 #[rstest]
 #[awt]
-#[traced_test]
 #[tokio::test]
 async fn find_non_extant_security_with_ticker_returns_zero_elements(
-    #[future] test_db_conn: Result<DbConnection>,
+    #[future] test_db_conn_old: Result<DbConnectionOld>,
     security: Security,
 ) -> Result<()> {
-    let dbc = test_db_conn?;
+    let dbc = test_db_conn_old?;
 
     let result = Security::find_by_ticker(&dbc.db, security.ticker()).await;
     assert!(result.is_ok());
@@ -355,13 +475,12 @@ async fn find_non_extant_security_with_ticker_returns_zero_elements(
 
 #[rstest]
 #[awt]
-#[traced_test]
 #[tokio::test]
 async fn find_security_with_ticker_and_two_match_works(
-    #[future] test_db_conn: Result<DbConnection>,
+    #[future] test_db_conn_old: Result<DbConnectionOld>,
     security: Security,
 ) -> Result<()> {
-    let dbc = test_db_conn?;
+    let dbc = test_db_conn_old?;
     security.insert(&dbc.db, None).await?;
 
     let security2 = Security::new(SecurityType::Stock, security.ticker(), "NYSE", None);
@@ -380,13 +499,12 @@ async fn find_security_with_ticker_and_two_match_works(
 
 #[rstest]
 #[awt]
-#[traced_test]
 #[tokio::test]
 async fn find_security_by_conid_works(
-    #[future] test_db_conn: Result<DbConnection>,
+    #[future] test_db_conn_old: Result<DbConnectionOld>,
     security_with_conid: Security,
 ) -> Result<()> {
-    let dbc = test_db_conn?;
+    let dbc = test_db_conn_old?;
     security_with_conid.insert(&dbc.db, None).await?;
 
     let result = Security::find_by_conid(&dbc.db, security_with_conid.ibkr_conid().unwrap()).await;
@@ -401,13 +519,12 @@ async fn find_security_by_conid_works(
 
 #[rstest]
 #[awt]
-#[traced_test]
 #[tokio::test]
 async fn find_non_extant_security_by_conid_fails(
-    #[future] test_db_conn: Result<DbConnection>,
+    #[future] test_db_conn_old: Result<DbConnectionOld>,
     security_with_conid: Security,
 ) -> Result<()> {
-    let dbc = test_db_conn?;
+    let dbc = test_db_conn_old?;
 
     let result = Security::find_by_conid(&dbc.db, security_with_conid.ibkr_conid().unwrap()).await;
     assert!(result.is_ok());
@@ -420,13 +537,12 @@ async fn find_non_extant_security_by_conid_fails(
 
 #[rstest]
 #[awt]
-#[traced_test]
 #[tokio::test]
 async fn insert_trade_execution_works(
-    #[future] test_db_conn: Result<DbConnection>,
+    #[future] test_db_conn_old: Result<DbConnectionOld>,
     trade_execution_desc: TradeExecutionDesc,
 ) -> Result<()> {
-    let dbc = test_db_conn?;
+    let dbc = test_db_conn_old?;
 
     // Insert the brokerage account and security first.
     trade_execution_desc
@@ -470,13 +586,12 @@ async fn insert_trade_execution_works(
 
 #[rstest]
 #[awt]
-#[traced_test]
 #[tokio::test]
 async fn insert_two_trade_executions_works(
-    #[future] test_db_conn: Result<DbConnection>,
+    #[future] test_db_conn_old: Result<DbConnectionOld>,
     trade_execution_desc: TradeExecutionDesc,
 ) -> Result<()> {
-    let dbc = test_db_conn?;
+    let dbc = test_db_conn_old?;
 
     // Insert the brokerage account and security first.
     trade_execution_desc

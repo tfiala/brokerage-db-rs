@@ -1,12 +1,21 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use bson::oid::ObjectId;
 use futures::TryStreamExt;
 use mongodb::{ClientSession, Database};
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, sync::Arc};
+use std::{any::Any, fmt::Debug, sync::Arc};
 use tokio::sync::Mutex;
 
 use crate::db_util;
+
+#[async_trait]
+pub trait IBrokerageAccount: Send + Debug + Sync {
+    fn as_any(&self) -> &dyn Any;
+
+    fn account_id(&self) -> &str;
+    fn brokerage_id(&self) -> &str;
+}
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct BrokerageAccount {
