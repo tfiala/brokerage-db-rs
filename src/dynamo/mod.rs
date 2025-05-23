@@ -180,16 +180,17 @@ impl DbConnection for DynamoDbConnection {
 
         if let Some(items) = results.items {
             let baccts: Vec<DynamoBrokerageAccount> = items.iter().map(|v| v.into()).collect();
-            if baccts.len() == 1 {
-                Ok(Some(Box::new(baccts[0].clone())))
-            } else if baccts.len() > 1 {
-                Err(anyhow::anyhow!(
+            match baccts.len().cmp(&1) {
+                std::cmp::Ordering::Less => {
+                    // No match found.
+                    Ok(None)
+                }
+                std::cmp::Ordering::Equal => Ok(Some(Box::new(baccts[0].clone()))),
+                std::cmp::Ordering::Greater => Err(anyhow::anyhow!(
                     "dynamodb: found multiple brokerage accounts for account_id: {}, brokerage_id: {}",
                     account_id,
                     brokerage_id
-                ))
-            } else {
-                Ok(None)
+                )),
             }
         } else {
             Ok(None)
