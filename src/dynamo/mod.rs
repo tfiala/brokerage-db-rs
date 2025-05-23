@@ -131,22 +131,41 @@ impl DbConnection for DynamoDbConnection {
     }
 
     async fn find_bacct_all(&self) -> Result<Vec<Box<dyn IBrokerageAccount>>> {
-        todo!()
-        // let mdb_baccts = self
-        //     .db
-        //     .collection::<MdbBrokerageAccount>(MdbBrokerageAccount::COLLECTION_NAME)
-        //     .find(bson::doc! {})
-        //     .await?
-        //     .try_collect::<Vec<MdbBrokerageAccount>>()
-        //     .await?;
-        // let boxed_baccts = mdb_baccts
-        //     .into_iter()
-        //     .map(|bacct| {
-        //         let boxed_bacct: Box<dyn IBrokerageAccount<ObjectId>> = Box::new(bacct);
-        //         boxed_bacct
-        //     })
-        //     .collect();
-        // Ok(boxed_baccts)
+        // let page_size = page_size.unwrap_or(10);
+        // let items: Result<Vec<_>, _> = client
+        //     .scan()
+        //     .table_name(table)
+        //     .limit(page_size)
+        //     .into_paginator()
+        //     .items()
+        //     .send()
+        //     .collect()
+        //     .await;
+
+        let items = self
+            .client
+            .scan()
+            .table_name(DynamoBrokerageAccount::TABLE_NAME)
+            // .limit(1000000)
+            .into_paginator()
+            .items()
+            .send()
+            // .collect::<Vec<HashMap<String, AttributeValue>>>()
+            .collect::<Vec<_>>()
+            .await;
+
+        println!("scan items: {:?}", items);
+
+        let baccts: Vec<Box<dyn IBrokerageAccount>> = items
+            .into_iter()
+            .map(|item| {
+                let bacct = DynamoBrokerageAccount::from(&item.unwrap());
+                let bacct_boxed: Box<dyn IBrokerageAccount> = Box::new(bacct);
+                bacct_boxed
+            })
+            .collect();
+
+        Ok(baccts)
     }
 
     async fn find_bacct_by_brokerage_and_account_id(

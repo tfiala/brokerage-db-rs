@@ -57,16 +57,16 @@ async fn test_db_conn() -> Result<TestDbConnection> {
 const BROKERAGE_ID: &str = "batch-brokers";
 const BROKERAGE_ACCOUNT_ID: &str = "A1234567";
 
-// const BROKERAGE_ID_2: &str = "another-broker";
-// const BROKERAGE_ACCOUNT_ID_2: &str = "DA7654321";
+const BROKERAGE_ID_2: &str = "another-broker";
+const BROKERAGE_ACCOUNT_ID_2: &str = "DA7654321";
 
 fn brokerage_account(db_conn: &dyn DbConnection) -> Box<dyn IBrokerageAccount> {
     db_conn.new_brokerage_account(BROKERAGE_ACCOUNT_ID, BROKERAGE_ID)
 }
 
-// fn brokerage_account_2(db_conn: &dyn DbConnection) -> Box<dyn IBrokerageAccount> {
-//     db_conn.new_brokerage_account(BROKERAGE_ACCOUNT_ID_2, BROKERAGE_ID_2)
-// }
+fn brokerage_account_2(db_conn: &dyn DbConnection) -> Box<dyn IBrokerageAccount> {
+    db_conn.new_brokerage_account(BROKERAGE_ACCOUNT_ID_2, BROKERAGE_ID_2)
+}
 
 #[tokio::test]
 async fn test_succeeds() -> Result<()> {
@@ -145,5 +145,49 @@ async fn insert_duplicate_brokerage_account_fails(
 
     assert!(result.is_err());
 
+    Ok(())
+}
+
+#[rstest]
+#[awt]
+#[tokio::test]
+async fn find_all_brokerage_accounts_works(
+    #[future] test_db_conn: Result<TestDbConnection>,
+) -> Result<()> {
+    let test_db_conn = test_db_conn.unwrap();
+
+    let brokerage_account = brokerage_account(test_db_conn.db_conn.as_ref());
+    test_db_conn
+        .db_conn
+        .insert_bacct(brokerage_account.as_ref())
+        .await?;
+
+    let brokerage_account_2 = brokerage_account_2(test_db_conn.db_conn.as_ref());
+    test_db_conn
+        .db_conn
+        .insert_bacct(brokerage_account_2.as_ref())
+        .await?;
+
+    let found_accounts = test_db_conn.db_conn.find_bacct_all().await?;
+
+    assert_eq!(found_accounts.len(), 2);
+
+    assert!(
+        brokerage_account.account_id() == found_accounts[0].account_id()
+            || brokerage_account.account_id() == found_accounts[1].account_id()
+    );
+    assert!(
+        brokerage_account.brokerage_id() == found_accounts[0].brokerage_id()
+            || brokerage_account.brokerage_id() == found_accounts[1].brokerage_id()
+    );
+
+    assert!(
+        brokerage_account_2.account_id() == found_accounts[0].account_id()
+            || brokerage_account_2.account_id() == found_accounts[1].account_id()
+    );
+    assert!(
+        brokerage_account_2.brokerage_id() == found_accounts[0].brokerage_id()
+            || brokerage_account_2.brokerage_id() == found_accounts[1].brokerage_id()
+    );
     Ok(())
 }
