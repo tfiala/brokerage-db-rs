@@ -11,7 +11,7 @@ anyhow = "1.0.98"
 async-trait = "0.1.88"
 bson = "2.14.0"
 futures = "0.3.31"
-mongodb = "3.2.3"
+mongodb = "3.2.5"
 serde = { version = "1.0.219", features = ["derive"] }
 tfiala-mongodb-migrator = "0.2.4"
 tokio = { version = "1.45.0", features = ["full"] }
