@@ -1,11 +1,13 @@
 mod runner;
 mod v001_add_brokerage_account;
+mod v002_add_security;
 
 use anyhow::Result;
 use async_trait::async_trait;
 use aws_sdk_dynamodb::Client;
 use runner::Runner;
 use v001_add_brokerage_account::*;
+use v002_add_security::*;
 
 #[async_trait]
 pub trait Migration: Send + Sync {

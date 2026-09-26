@@ -1,9 +1,14 @@
 mod account;
+mod security;
+
 pub mod migrations;
 
 use crate::{
-    account::IBrokerageAccount, db_connection::DbConnection,
-    db_connection_factory::DbConnectionFactory, db_util,
+    account::IBrokerageAccount,
+    db_connection::DbConnection,
+    db_connection_factory::DbConnectionFactory,
+    db_util,
+    security::{ISecurity, SecurityType},
 };
 use account::MdbBrokerageAccount;
 use anyhow::Result;
@@ -11,6 +16,7 @@ use async_trait::async_trait;
 use bson::oid::ObjectId;
 use futures::TryStreamExt;
 use mongodb::{Client, Database};
+use security::MdbSecurity;
 
 pub struct MdbConnectionFactory {
     uri: String,
@@ -152,4 +158,37 @@ impl DbConnection for MdbDbConnection {
     //         Ok(None)
     //     }
     // }
+
+    //
+    // Securities
+    //
+
+    fn new_security(
+        &self,
+        security_type: SecurityType,
+        ticker: &str,
+        listing_exchange: &str,
+        ibkr_conid: Option<u32>,
+    ) -> Result<Box<dyn ISecurity>> {
+        Ok(Box::new(MdbSecurity::new(
+            security_type,
+            ticker,
+            listing_exchange,
+            ibkr_conid,
+        )))
+    }
+
+    async fn insert_security(&self, security: &dyn ISecurity) -> Result<()> {
+        let mdb_security = security.as_any().downcast_ref::<MdbSecurity>().unwrap();
+        // TODO figure out session handling
+        let session = None;
+        db_util::insert(
+            &mdb_security,
+            &self.db,
+            MdbSecurity::COLLECTION_NAME,
+            session,
+        )
+        .await?;
+        Ok(())
+    }
 }

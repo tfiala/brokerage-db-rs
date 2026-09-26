@@ -1,7 +1,10 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use crate::account::IBrokerageAccount;
+use crate::{
+    account::IBrokerageAccount,
+    security::{ISecurity, SecurityType},
+};
 
 #[async_trait]
 pub trait DbConnection {
@@ -29,5 +32,17 @@ pub trait DbConnection {
         brokerage_id: &str,
         account_id: &str,
     ) -> Result<Option<Box<dyn IBrokerageAccount>>>;
-    // async fn find_bacct_by_dbid(&self, dbid: &I) -> Result<Option<Box<dyn IBrokerageAccount>>>;
+
+    //
+    // Securities
+    //
+
+    fn new_security(
+        &self,
+        security_type: SecurityType,
+        ticker: &str,
+        listing_exchange: &str,
+        ibkr_conid: Option<u32>,
+    ) -> Result<Box<dyn ISecurity>>;
+    async fn insert_security(&self, security: &dyn ISecurity) -> Result<()>;
 }
